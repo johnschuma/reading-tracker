@@ -394,11 +394,11 @@ function Bookmark() {
   // ── Auth handlers ──
   const handleAuth = async () => {
     setAuthBusy(true); setAuthError(null);
-    const { error } = authMode === "signup"
+    const { data, error } = authMode === "signup"
       ? await sb.auth.signUp({ email: authEmail, password: authPass })
       : await sb.auth.signInWithPassword({ email: authEmail, password: authPass });
     if (error) setAuthError(error.message);
-    else setScreen(SCREENS.HOME);
+    else if (data?.user) setUser(data.user);
     setAuthBusy(false);
   };
 
