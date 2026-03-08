@@ -627,21 +627,27 @@ function Bookmark() {
   if (screen === SCREENS.HOME) {
     const hasGoals = profile.goal_minutes > 0 || profile.goal_pages > 0;
     return (
-      <div style={S.app}>
+      <div style={{ ...S.app, paddingBottom:80 }}>
         {showStreakModal && <StreakModal streak={newStreak} onClose={() => setShowStreakModal(false)}/>}
+
+        {/* ── Top bar ── */}
         <div style={S.hdr}>
           <div style={{ display:"flex", alignItems:"center", gap:8 }}>
             <LogoMark size={22} color="rgba(255,255,255,0.7)"/>
             <span style={S.logoText}>BOOKMARK</span>
           </div>
-          <div style={{ display:"flex", alignItems:"center", gap:14 }}>
-            {profile.streak > 0 && <div style={{ fontSize:12, color:"rgba(255,255,255,0.4)", letterSpacing:0.5 }}>{profile.streak}d</div>}
-            <button onClick={() => setScreen(SCREENS.GOALS)} style={{ background:"none", border:"1px solid rgba(255,255,255,0.12)", borderRadius:8, cursor:"pointer", color:"rgba(255,255,255,0.5)", fontSize:11, fontFamily:"inherit", padding:"5px 10px", letterSpacing:1 }}>GOALS</button>
+          <div style={{ display:"flex", alignItems:"center", gap:12 }}>
+            {profile.streak > 0 && (
+              <div style={{ fontSize:12, color:"rgba(255,255,255,0.4)", letterSpacing:0.5 }}>{profile.streak}d</div>
+            )}
             <button onClick={handleSignOut} style={{ ...S.back, fontSize:12 }}>Sign out</button>
           </div>
         </div>
-        <div style={{ padding:"0 22px 50px" }}>
-          {hasGoals ? (
+
+        <div style={{ padding:"0 22px" }}>
+
+          {/* ── Fitness rings ── */}
+          {hasGoals && (
             <div style={{ ...S.card, display:"flex", alignItems:"center", gap:18, padding:"16px 18px", marginBottom:18 }}>
               <div style={{ position:"relative", flexShrink:0, width:90, height:90 }}>
                 <FitnessRings minutesPct={minutesPct} pagesPct={pagesPct} size={90}/>
@@ -676,41 +682,84 @@ function Bookmark() {
                 )}
               </div>
             </div>
-          ) : <div style={{ marginBottom:16 }}/>}
-          <button style={{ ...S.pBtn, marginTop:0, marginBottom:28, padding:"19px", fontSize:17 }}
-            onClick={() => { setElapsed(0); setTimerRunning(false); setCountdownDone(false); setScreen(SCREENS.TIMER); }}>
-            Begin Reading Session
-          </button>
+          )}
+
+          {/* ── Timer hero ── */}
+          <div
+            onClick={() => { setElapsed(0); setTimerRunning(false); setCountdownDone(false); setScreen(SCREENS.TIMER); }}
+            style={{ ...S.card, textAlign:"center", padding:"32px 22px", marginBottom:18, cursor:"pointer", borderColor:"rgba(255,255,255,0.1)" }}>
+            <div style={{ fontSize:56, fontWeight:700, letterSpacing:-3, lineHeight:1, fontFamily:"'Times New Roman',Times,serif", color:"#fff", marginBottom:8 }}>
+              {fmt(elapsed > 0 ? elapsed : 0)}
+            </div>
+            <div style={{ fontSize:9, letterSpacing:4, color:"rgba(255,255,255,0.25)", textTransform:"uppercase", marginBottom:20 }}>
+              {elapsed > 0 ? "paused — tap to resume" : "tap to begin reading"}
+            </div>
+            <div style={{ display:"inline-flex", alignItems:"center", justifyContent:"center", width:56, height:56, borderRadius:"50%", background:"linear-gradient(135deg,#fff,#888)" }}>
+              <svg width={18} height={18} viewBox="0 0 18 18" fill="none">
+                <path d="M5 3.5L14.5 9L5 14.5V3.5Z" fill="#000"/>
+              </svg>
+            </div>
+          </div>
+
+          {/* ── Instagram-style grid ── */}
           {sessionsLoading ? (
             <div style={{ textAlign:"center", color:"rgba(255,255,255,0.2)", fontSize:13, padding:"40px 0" }}>Loading…</div>
           ) : sessions.length > 0 ? (
             <>
-              <div style={{ fontSize:10, letterSpacing:3, color:"rgba(255,255,255,0.2)", marginBottom:14 }}>READING HISTORY</div>
-              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10 }}>
+              <div style={{ fontSize:10, letterSpacing:3, color:"rgba(255,255,255,0.2)", marginBottom:10 }}>READING HISTORY</div>
+              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:2, margin:"0 -22px" }}>
                 {sessions.map((s, i) => (
-                  <div key={s.id || i} style={{ borderRadius:14, overflow:"hidden", background:"rgba(255,255,255,0.04)", border:"1px solid rgba(255,255,255,0.05)", aspectRatio:"3/4", position:"relative" }}>
+                  <div key={s.id || i} style={{ position:"relative", aspectRatio:"1/1", background:"#111", overflow:"hidden" }}>
                     {s.photo_url
                       ? <img src={s.photo_url} style={{ position:"absolute", inset:0, width:"100%", height:"100%", objectFit:"cover" }}/>
                       : s.book?.open_library_cover_id
-                        ? <img src={"https://covers.openlibrary.org/b/id/" + s.book.open_library_cover_id + "-M.jpg"} crossOrigin="anonymous" style={{ position:"absolute", inset:0, width:"100%", height:"100%", objectFit:"cover", opacity:0.45 }}/>
-                        : <div style={{ position:"absolute", inset:0, background:"#111", display:"flex", alignItems:"center", justifyContent:"center" }}><LogoMark size={24} color="rgba(255,255,255,0.1)"/></div>
+                        ? <img src={"https://covers.openlibrary.org/b/id/" + s.book.open_library_cover_id + "-M.jpg"} crossOrigin="anonymous" style={{ position:"absolute", inset:0, width:"100%", height:"100%", objectFit:"cover", opacity:0.5 }}/>
+                        : <div style={{ position:"absolute", inset:0, background:"#111", display:"flex", alignItems:"center", justifyContent:"center" }}><LogoMark size={20} color="rgba(255,255,255,0.08)"/></div>
                     }
-                    <div style={{ position:"absolute", inset:0, background:"linear-gradient(to top,rgba(0,0,0,0.88) 0%,transparent 55%)" }}/>
-                    <div style={{ position:"absolute", bottom:10, left:10, right:10 }}>
-                      {s.book?.title && <div style={{ fontSize:11, fontWeight:700, color:"#fff", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap", marginBottom:2 }}>{s.book.title}</div>}
-                      <div style={{ fontSize:10, color:"rgba(255,255,255,0.55)" }}>{fmtLabel(s.time_secs || 0)}{s.pages_read ? ` · ${s.pages_read}pg` : ""}</div>
-                      <div style={{ fontSize:9, color:"rgba(255,255,255,0.3)", marginTop:1 }}>{s.date_str}</div>
+                    <div style={{ position:"absolute", inset:0, background:"linear-gradient(to top,rgba(0,0,0,0.75) 0%,transparent 50%)" }}/>
+                    <div style={{ position:"absolute", bottom:6, left:6, right:6 }}>
+                      {s.book?.title && <div style={{ fontSize:9, fontWeight:700, color:"#fff", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{s.book.title}</div>}
+                      <div style={{ fontSize:8, color:"rgba(255,255,255,0.5)", marginTop:1 }}>{fmtLabel(s.time_secs || 0)}{s.pages_read ? ` · ${s.pages_read}pg` : ""}</div>
                     </div>
-                    {s.finished && <div style={{ position:"absolute", top:8, right:8, background:"rgba(0,0,0,0.5)", borderRadius:6, padding:"2px 7px", fontSize:9, color:"rgba(255,255,255,0.7)", backdropFilter:"blur(6px)" }}>Finished</div>}
+                    {s.finished && (
+                      <div style={{ position:"absolute", top:5, right:5, background:"rgba(0,0,0,0.6)", borderRadius:4, padding:"2px 5px", fontSize:8, color:"rgba(255,255,255,0.7)", backdropFilter:"blur(6px)" }}>Finished</div>
+                    )}
                   </div>
                 ))}
               </div>
             </>
           ) : (
-            <div style={{ textAlign:"center", padding:"50px 0", color:"rgba(255,255,255,0.15)", fontSize:14, fontStyle:"italic", lineHeight:1.7 }}>
+            <div style={{ textAlign:"center", padding:"40px 0", color:"rgba(255,255,255,0.15)", fontSize:14, fontStyle:"italic", lineHeight:1.7 }}>
               Your reading history<br/>will appear here.
             </div>
           )}
+        </div>
+
+        {/* ── Bottom nav ── */}
+        <div style={{ position:"fixed", bottom:0, left:"50%", transform:"translateX(-50%)", width:"100%", maxWidth:430, background:"rgba(7,7,15,0.95)", borderTop:"1px solid rgba(255,255,255,0.07)", backdropFilter:"blur(12px)", display:"flex", alignItems:"center", justifyContent:"space-around", padding:"10px 0 20px", zIndex:100 }}>
+          {/* Home */}
+          <button onClick={() => setScreen(SCREENS.HOME)} style={{ background:"none", border:"none", cursor:"pointer", display:"flex", flexDirection:"column", alignItems:"center", gap:4, padding:"4px 16px" }}>
+            <svg width={22} height={22} viewBox="0 0 24 24" fill="none">
+              <path d="M3 12L12 3L21 12V21H15V15H9V21H3V12Z" stroke="#fff" strokeWidth="1.8" strokeLinejoin="round" fill="rgba(255,255,255,0.15)"/>
+            </svg>
+            <span style={{ fontSize:9, color:"#fff", letterSpacing:1, textTransform:"uppercase" }}>Home</span>
+          </button>
+          {/* Timer / Record */}
+          <button onClick={() => { setElapsed(0); setTimerRunning(false); setCountdownDone(false); setScreen(SCREENS.TIMER); }}
+            style={{ background:"linear-gradient(135deg,#fff,#888)", border:"none", cursor:"pointer", borderRadius:"50%", width:52, height:52, display:"flex", alignItems:"center", justifyContent:"center", marginBottom:8, boxShadow:"0 4px 20px rgba(255,255,255,0.2)" }}>
+            <svg width={18} height={18} viewBox="0 0 18 18" fill="none">
+              <path d="M5 3.5L14.5 9L5 14.5V3.5Z" fill="#000"/>
+            </svg>
+          </button>
+          {/* Goals */}
+          <button onClick={() => setScreen(SCREENS.GOALS)} style={{ background:"none", border:"none", cursor:"pointer", display:"flex", flexDirection:"column", alignItems:"center", gap:4, padding:"4px 16px" }}>
+            <svg width={22} height={22} viewBox="0 0 24 24" fill="none">
+              <circle cx="12" cy="12" r="9" stroke="rgba(255,255,255,0.5)" strokeWidth="1.8"/>
+              <circle cx="12" cy="12" r="5" stroke="rgba(255,255,255,0.5)" strokeWidth="1.8"/>
+              <circle cx="12" cy="12" r="1.5" fill="rgba(255,255,255,0.5)"/>
+            </svg>
+            <span style={{ fontSize:9, color:"rgba(255,255,255,0.5)", letterSpacing:1, textTransform:"uppercase" }}>Goals</span>
+          </button>
         </div>
       </div>
     );
