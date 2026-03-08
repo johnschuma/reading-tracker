@@ -1131,4 +1131,47 @@ function Bookmark() {
   return null;
 }
 
+// ── Goals screen ──
+  if (screen === SCREENS.GOALS) {
+    const saveGoals = async () => {
+      setGoalsSaving(true);
+      await sb.from("profiles").upsert({ id: user.id, goal_minutes: parseInt(gMin) || 0, goal_pages: parseInt(gPg) || 0 });
+      await loadProfile(); setGoalsSaving(false); setScreen(SCREENS.HOME);
+    };
+    return (
+      <div style={S.app}>
+        <div style={S.hdr}>
+          <button style={S.back} onClick={() => setScreen(SCREENS.HOME)}>← Back</button>
+          <span style={S.sub}>Daily Goals</span>
+          <div style={{ width:56 }}/>
+        </div>
+        <div style={{ padding:"20px 28px 40px" }}>
+          <div style={{ fontSize:14, color:"rgba(255,255,255,0.35)", marginBottom:32, lineHeight:1.8 }}>
+            Set a daily reading goal. The rings on your home screen update as you read each day.
+          </div>
+          <div style={{ marginBottom:22 }}>
+            <label style={S.label}>DAILY TIME GOAL (MINUTES)</label>
+            <input style={S.inp} type="number" placeholder="e.g. 30" value={gMin} onChange={e => setGMin(e.target.value)}/>
+            <div style={{ fontSize:11, color:"rgba(255,255,255,0.2)", marginTop:6 }}>Set to 0 to disable.</div>
+          </div>
+          <div style={{ marginBottom:32 }}>
+            <label style={S.label}>DAILY PAGES GOAL</label>
+            <input style={S.inp} type="number" placeholder="e.g. 20" value={gPg} onChange={e => setGPg(e.target.value)}/>
+            <div style={{ fontSize:11, color:"rgba(255,255,255,0.2)", marginTop:6 }}>Set to 0 to disable.</div>
+          </div>
+          <div style={{ padding:"20px 20px", background:"rgba(255,255,255,0.03)", borderRadius:14, border:"1px solid rgba(255,255,255,0.06)", marginBottom:28 }}>
+            <div style={{ fontSize:10, letterSpacing:3, color:"rgba(255,255,255,0.25)", marginBottom:10 }}>CURRENT STREAK</div>
+            <div style={{ fontSize:42, fontWeight:800, letterSpacing:-2, lineHeight:1 }}>{profile.streak}</div>
+            <div style={{ fontSize:12, color:"rgba(255,255,255,0.3)", marginTop:5 }}>consecutive day{profile.streak !== 1 ? "s" : ""} read</div>
+          </div>
+          <button style={{ ...S.pBtn, marginTop:0, opacity: goalsSaving ? 0.6 : 1 }} onClick={saveGoals} disabled={goalsSaving}>
+            {goalsSaving ? "Saving…" : "Save Goals"}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return null;
+}
 ReactDOM.createRoot(document.getElementById("root")).render(<Bookmark/>);
