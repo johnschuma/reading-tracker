@@ -1,50 +1,14 @@
 // ─────────────────────────────────────────────
-// SUPABASE — replace these two values with your project's URL and anon key
+// SUPABASE — replace with your project's URL and anon key
 // from https://supabase.com → Project Settings → API
 // ─────────────────────────────────────────────
 const SUPABASE_URL  = "https://jomzkkkldwfjhclybjmr.supabase.co";
 const SUPABASE_ANON = "sb_publishable_fnt9otLn88io2XIBhZBspw_ib5RG-k3";
 
-/*
-  ── SUPABASE SETUP ──────────────────────────────────────────────────────────
-  Run this SQL once in Supabase → SQL Editor:
-
-  create table profiles (
-    id uuid references auth.users primary key,
-    goal_minutes int default 0,
-    goal_pages   int default 0,
-    streak       int default 0,
-    last_read_date text default ''
-  );
-
-  create table sessions (
-    id           uuid primary key default gen_random_uuid(),
-    user_id      uuid references auth.users not null,
-    book         jsonb,
-    time_secs    int,
-    pages_read   int,
-    current_page int,
-    finished     boolean default false,
-    photo_url    text,
-    date_str     text,
-    created_at   timestamptz default now()
-  );
-
-  -- Storage bucket: Supabase dashboard → Storage → New bucket → "reading_photos" (public)
-
-  alter table profiles enable row level security;
-  alter table sessions enable row level security;
-  create policy "own profile" on profiles for all using (auth.uid() = id);
-  create policy "own sessions" on sessions for all using (auth.uid() = user_id);
-  create policy "own photos" on storage.objects for all
-    using (auth.uid()::text = (storage.foldername(name))[1]);
-  ────────────────────────────────────────────────────────────────────────── */
-
 const { useState, useEffect, useRef, useCallback } = React;
 const { createClient } = supabase;
 const sb = createClient(SUPABASE_URL, SUPABASE_ANON);
 
-// ─── Constants ───────────────────────────────
 const SCREENS = { AUTH:"auth", HOME:"home", TIMER:"timer", CAMERA:"camera", COMPOSE:"compose", GOALS:"goals" };
 
 const QUOTES = [
@@ -72,7 +36,6 @@ const PRESET_MINUTES = [5, 10, 15, 20, 30, 45, 60];
 const CARD_W = 200;
 const CARD_H = Math.round(CARD_W * 4 / 3);
 
-// ─── Helpers ─────────────────────────────────
 const fmt = s => {
   const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
   if (h > 0) return h + ":" + String(m).padStart(2, "0") + ":" + String(sec).padStart(2, "0");
@@ -96,10 +59,7 @@ async function claudeSearchBooks(query) {
     body: JSON.stringify({
       model: "claude-sonnet-4-20250514",
       max_tokens: 1000,
-      messages: [{
-        role: "user",
-        content: "You are a book database. Return a JSON array of up to 5 real books matching: " + JSON.stringify(query) + ". Each object: title (string), author_name (array of strings), first_publish_year (string), open_library_cover_id (integer or null). ONLY raw JSON array."
-      }]
+      messages: [{ role: "user", content: "You are a book database. Return a JSON array of up to 5 real books matching: " + JSON.stringify(query) + ". Each object: title (string), author_name (array of strings), first_publish_year (string), open_library_cover_id (integer or null). ONLY raw JSON array." }]
     })
   });
   const d = await r.json();
@@ -120,7 +80,6 @@ function playAlarm() {
   } catch(e) {}
 }
 
-// ─── Shared style objects ─────────────────────
 const S = {
   app:      { fontFamily:"'Times New Roman',Times,serif", background:"#07070f", minHeight:"100vh", maxWidth:430, margin:"0 auto", color:"#fff" },
   hdr:      { padding:"22px 22px 10px", display:"flex", alignItems:"center", justifyContent:"space-between" },
@@ -134,37 +93,30 @@ const S = {
   label:    { fontSize:10, letterSpacing:3, color:"rgba(255,255,255,0.3)", marginBottom:8, display:"block" },
 };
 
-// ─── LogoMark ─────────────────────────────────
 function LogoMark({ size = 28, color = "white" }) {
   return (
     <svg width={size} height={size} viewBox="0 0 28 28" fill="none">
-      <path d="M14 3 C13 3 7 3.5 7 8 L7 25 C9.5 23.5 12 23 14 25 C16 23 18.5 23.5 21 25 L21 8 C21 3.5 15 3 14 3Z"
-        stroke={color} strokeWidth="1.8" strokeLinejoin="round" fill="none"/>
+      <path d="M14 3 C13 3 7 3.5 7 8 L7 25 C9.5 23.5 12 23 14 25 C16 23 18.5 23.5 21 25 L21 8 C21 3.5 15 3 14 3Z" stroke={color} strokeWidth="1.8" strokeLinejoin="round" fill="none"/>
       <path d="M14 3 L14 25" stroke={color} strokeWidth="1.2" strokeDasharray="2 2" opacity="0.5"/>
-      <path d="M9 10 L12.5 10 M9 13.5 L12.5 13.5 M9 17 L12.5 17"
-        stroke={color} strokeWidth="1.4" strokeLinecap="round" opacity="0.6"/>
+      <path d="M9 10 L12.5 10 M9 13.5 L12.5 13.5 M9 17 L12.5 17" stroke={color} strokeWidth="1.4" strokeLinecap="round" opacity="0.6"/>
     </svg>
   );
 }
 
-// ─── FitnessRings ─────────────────────────────
 function FitnessRings({ minutesPct, pagesPct, size = 90 }) {
   const cx = size / 2, cy = size / 2, r1 = size * 0.42, r2 = size * 0.29, sw = size * 0.085;
   const arc = (r, pct) => { const c = 2 * Math.PI * r; return { da: c, do: c * (1 - Math.min(pct, 1)) }; };
   const a1 = arc(r1, minutesPct), a2 = arc(r2, pagesPct);
   return (
-    <svg width={size} height={size} style={{ transform: "rotate(-90deg)" }}>
+    <svg width={size} height={size} style={{ transform:"rotate(-90deg)" }}>
       <circle cx={cx} cy={cy} r={r1} fill="none" stroke="rgba(255,255,255,0.07)" strokeWidth={sw}/>
-      <circle cx={cx} cy={cy} r={r1} fill="none" stroke="#fff" strokeWidth={sw}
-        strokeDasharray={a1.da} strokeDashoffset={a1.do} strokeLinecap="round"/>
+      <circle cx={cx} cy={cy} r={r1} fill="none" stroke="#fff" strokeWidth={sw} strokeDasharray={a1.da} strokeDashoffset={a1.do} strokeLinecap="round"/>
       <circle cx={cx} cy={cy} r={r2} fill="none" stroke="rgba(255,255,255,0.07)" strokeWidth={sw}/>
-      <circle cx={cx} cy={cy} r={r2} fill="none" stroke="rgba(255,255,255,0.5)" strokeWidth={sw}
-        strokeDasharray={a2.da} strokeDashoffset={a2.do} strokeLinecap="round"/>
+      <circle cx={cx} cy={cy} r={r2} fill="none" stroke="rgba(255,255,255,0.5)" strokeWidth={sw} strokeDasharray={a2.da} strokeDashoffset={a2.do} strokeLinecap="round"/>
     </svg>
   );
 }
 
-// ─── StreakModal ──────────────────────────────
 function StreakModal({ streak, onClose }) {
   const msg = STREAK_MSGS[Math.min(streak - 1, STREAK_MSGS.length - 1)](streak);
   return (
@@ -182,7 +134,6 @@ function StreakModal({ streak, onClose }) {
   );
 }
 
-// ─── Card Templates ───────────────────────────
 function CardBalanced({ book, sessionTime, pagesRead, currentPage, bookFinished, scale }) {
   const pad = 16;
   return (
@@ -276,11 +227,8 @@ const TEMPLATES = [
   { id:"block",     label:"Block",     Component:CardBlock     },
 ];
 
-// ─────────────────────────────────────────────
-// MAIN APP
-// ─────────────────────────────────────────────
 function Bookmark() {
-  // ── Auth state ──
+
   const [user, setUser]               = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [authMode, setAuthMode]       = useState("signin");
@@ -289,34 +237,27 @@ function Bookmark() {
   const [authError, setAuthError]     = useState(null);
   const [authBusy, setAuthBusy]       = useState(false);
 
-  // ── Profile state ──
   const [profile, setProfile]                   = useState({ goal_minutes:0, goal_pages:0, streak:0, last_read_date:"" });
   const [showStreakModal, setShowStreakModal]     = useState(false);
   const [newStreak, setNewStreak]               = useState(0);
-  const [newStreak, setNewStreak]               = useState(0);
-  const [gMin, setGMin] = useState("");
-  const [gPg, setGPg] = useState("");
-  const [goalsSaving, setGoalsSaving] = useState(false);
+  const [gMin, setGMin]                         = useState("");
+  const [gPg, setGPg]                           = useState("");
+  const [goalsSaving, setGoalsSaving]           = useState(false);
 
-  // ── Sessions state ──
   const [sessions, setSessions]                 = useState([]);
   const [sessionsLoading, setSessionsLoading]   = useState(false);
+  const [screen, setScreen]                     = useState(SCREENS.HOME);
 
-  // ── Navigation ──
-  const [screen, setScreen] = useState(SCREENS.HOME);
-
-  // ── Timer state ──
-  const [timerMode, setTimerMode]         = useState("stopwatch");
-  const [timerRunning, setTimerRunning]   = useState(false);
-  const [elapsed, setElapsed]             = useState(0);
-  const [countdownSet, setCountdownSet]   = useState(20 * 60);
-  const [countdownLeft, setCountdownLeft] = useState(20 * 60);
-  const [countdownDone, setCountdownDone] = useState(false);
+  const [timerMode, setTimerMode]           = useState("stopwatch");
+  const [timerRunning, setTimerRunning]     = useState(false);
+  const [elapsed, setElapsed]               = useState(0);
+  const [countdownSet, setCountdownSet]     = useState(20 * 60);
+  const [countdownLeft, setCountdownLeft]   = useState(20 * 60);
+  const [countdownDone, setCountdownDone]   = useState(false);
   const [countdownInput, setCountdownInput] = useState("20");
-  const [sessionTime, setSessionTime]     = useState(0);
-  const [quoteIdx]                        = useState(() => Math.floor(Math.random() * QUOTES.length));
+  const [sessionTime, setSessionTime]       = useState(0);
+  const [quoteIdx]                          = useState(() => Math.floor(Math.random() * QUOTES.length));
 
-  // ── Book state ──
   const [bookExpanded, setBookExpanded]     = useState(false);
   const [searchQuery, setSearchQuery]       = useState("");
   const [searchResults, setSearchResults]   = useState([]);
@@ -334,30 +275,27 @@ function Bookmark() {
     return manualPages;
   })();
 
-  // ── Compose state ──
-  const [photo, setPhoto]                   = useState(null);
-  const [photoFile, setPhotoFile]           = useState(null);
-  const [cardFormat, setCardFormat]         = useState("square");
+  const [photo, setPhoto]                       = useState(null);
+  const [photoFile, setPhotoFile]               = useState(null);
+  const [cardFormat, setCardFormat]             = useState("square");
   const [selectedTemplate, setSelectedTemplate] = useState("balanced");
-  const [exporting, setExporting]           = useState(false);
-  const [savingSession, setSavingSession]   = useState(false);
-  const [cardPos, setCardPos]               = useState({ x:0.5, y:0.65 });
-  const [cardScale, setCardScale]           = useState(1.0);
-  const [showSwipeTip, setShowSwipeTip]     = useState(false);
+  const [exporting, setExporting]               = useState(false);
+  const [savingSession, setSavingSession]       = useState(false);
+  const [cardPos, setCardPos]                   = useState({ x:0.5, y:0.65 });
+  const [cardScale, setCardScale]               = useState(1.0);
+  const [showSwipeTip, setShowSwipeTip]         = useState(false);
 
-  // ── Refs ──
-  const intervalRef    = useRef(null);
-  const startTimeRef   = useRef(null);
-  const elapsedAtStart = useRef(0);
-  const fileInputRef   = useRef(null);
-  const cameraInputRef = useRef(null);
+  const intervalRef     = useRef(null);
+  const startTimeRef    = useRef(null);
+  const elapsedAtStart  = useRef(0);
+  const fileInputRef    = useRef(null);
+  const cameraInputRef  = useRef(null);
   const exportCanvasRef = useRef(null);
-  const previewRef     = useRef(null);
-  const gestureRef     = useRef({ dragging:false, pinching:false, lastX:0, lastY:0, startDist:0, startScale:1, startPos:{x:0.5,y:0.65}, pinchCenter:{x:0.5,y:0.65} });
-  const mouseRef       = useRef({ down:false, lx:0, ly:0 });
-  const swipeStartX    = useRef(null);
+  const previewRef      = useRef(null);
+  const gestureRef      = useRef({ dragging:false, pinching:false, lastX:0, lastY:0, startDist:0, startScale:1, startPos:{x:0.5,y:0.65}, pinchCenter:{x:0.5,y:0.65} });
+  const mouseRef        = useRef({ down:false, lx:0, ly:0 });
+  const swipeStartX     = useRef(null);
 
-  // ── Auth effects ──
   useEffect(() => {
     sb.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user || null);
@@ -373,7 +311,6 @@ function Bookmark() {
     loadSessions();
   }, [user]);
 
-  // ── Swipe tip timeout ──
   useEffect(() => {
     if (showSwipeTip) {
       const t = setTimeout(() => setShowSwipeTip(false), 3000);
@@ -381,7 +318,11 @@ function Bookmark() {
     }
   }, [showSwipeTip]);
 
-  // ── Data loaders ──
+  useEffect(() => {
+    setGMin(String(profile.goal_minutes || ""));
+    setGPg(String(profile.goal_pages || ""));
+  }, [profile]);
+
   const loadProfile = async () => {
     const { data } = await sb.from("profiles").select("*").eq("id", user.id).single();
     if (data) setProfile(data);
@@ -395,7 +336,6 @@ function Bookmark() {
     setSessionsLoading(false);
   };
 
-  // ── Auth handlers ──
   const handleAuth = async () => {
     setAuthBusy(true); setAuthError(null);
     const { data, error } = authMode === "signup"
@@ -408,7 +348,6 @@ function Bookmark() {
 
   const handleSignOut = async () => { await sb.auth.signOut(); setScreen(SCREENS.AUTH); };
 
-  // ── Timer effect ──
   useEffect(() => {
     if (timerRunning) {
       startTimeRef.current = Date.now(); elapsedAtStart.current = elapsed;
@@ -426,7 +365,6 @@ function Bookmark() {
     return () => clearInterval(intervalRef.current);
   }, [timerRunning]);
 
-  // ── Timer helpers ──
   const applyCountdown = () => {
     const m = Math.max(1, parseInt(countdownInput) || 20), s = m * 60;
     setCountdownSet(s); setCountdownLeft(s); setElapsed(0); setCountdownDone(false); setTimerRunning(false);
@@ -440,7 +378,6 @@ function Bookmark() {
   };
   const stopSession = () => { setTimerRunning(false); setSessionTime(elapsed); setScreen(SCREENS.CAMERA); };
 
-  // ── Book search ──
   const searchBooks = async () => {
     if (!searchQuery.trim()) return;
     setSearchLoading(true); setSearchError(null); setSearchResults([]);
@@ -449,7 +386,6 @@ function Bookmark() {
     setSearchLoading(false);
   };
 
-  // ── Photo upload ──
   const handlePhotoUpload = e => {
     const file = e.target.files[0]; if (!file) return;
     setPhotoFile(file);
@@ -458,7 +394,6 @@ function Bookmark() {
     reader.readAsDataURL(file);
   };
 
-  // ── Streak ──
   const computeStreak = (currentStreak, lastDate) => {
     const today = todayStr();
     const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
@@ -467,7 +402,6 @@ function Bookmark() {
     return 1;
   };
 
-  // ── Save session ──
   const saveSession = async () => {
     if (!user) { setScreen(SCREENS.HOME); return; }
     setSavingSession(true);
@@ -494,7 +428,14 @@ function Bookmark() {
     setScreen(SCREENS.HOME);
   };
 
-  // ── Today totals ──
+  const saveGoals = async () => {
+    setGoalsSaving(true);
+    await sb.from("profiles").upsert({ id: user.id, goal_minutes: parseInt(gMin) || 0, goal_pages: parseInt(gPg) || 0 });
+    await loadProfile();
+    setGoalsSaving(false);
+    setScreen(SCREENS.HOME);
+  };
+
   const todayTotals = (() => {
     const today = todayStr(); let mins = 0, pgs = 0;
     sessions.forEach(s => { if (s.created_at?.slice(0, 10) === today) { mins += Math.round((s.time_secs || 0) / 60); pgs += (s.pages_read || 0); } });
@@ -502,11 +443,8 @@ function Bookmark() {
   })();
   const minutesPct = profile.goal_minutes > 0 ? todayTotals.mins / profile.goal_minutes : 0;
   const pagesPct   = profile.goal_pages   > 0 ? todayTotals.pgs  / profile.goal_pages   : 0;
-
-  // ── Template index ──
   const tIdx = TEMPLATES.findIndex(t => t.id === selectedTemplate);
 
-  // ── Gesture handlers ──
   const getTwoTouchDist = t => { const dx = t[0].clientX - t[1].clientX, dy = t[0].clientY - t[1].clientY; return Math.sqrt(dx * dx + dy * dy); };
   const getTwoTouchCenter = (t, rect) => ({ x: ((t[0].clientX + t[1].clientX) / 2 - rect.left) / rect.width, y: ((t[0].clientY + t[1].clientY) / 2 - rect.top) / rect.height });
 
@@ -547,7 +485,6 @@ function Bookmark() {
   const onMouseUp = () => { mouseRef.current.down = false; };
   const onWheel = useCallback(e => { e.preventDefault(); setCardScale(s => Math.min(3, Math.max(0.3, s * (e.deltaY < 0 ? 1.08 : 0.93)))); }, []);
 
-  // ── Carousel swipe ──
   const onCarouselTouchStart = e => { swipeStartX.current = e.touches[0].clientX; };
   const onCarouselTouchEnd = e => {
     if (swipeStartX.current === null) return;
@@ -565,7 +502,6 @@ function Bookmark() {
     else if (dx > 0 && tIdx > 0) setSelectedTemplate(TEMPLATES[tIdx - 1].id);
   };
 
-  // ── Canvas export ──
   const exportCard = useCallback(async () => {
     setExporting(true);
     const W = 1080, H = cardFormat === "story" ? 1920 : 1080;
@@ -588,7 +524,6 @@ function Bookmark() {
         ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
       }
       ctx.save(); ctx.beginPath(); ctx.roundRect(rx, ry, cw, ch, radius); ctx.fillStyle = "rgba(0,0,0,0.20)"; ctx.fill(); ctx.restore();
-
       if (selectedTemplate === "balanced") {
         ctx.textAlign = "left"; ctx.font = "800 " + fs(34) + "px 'Helvetica Neue',Arial,sans-serif"; ctx.fillStyle = "#fff"; ctx.fillText(pagesRead || "—", rx + pad, ry + pad + fs(34));
         ctx.font = "600 " + fs(8) + "px 'Helvetica Neue',Arial,sans-serif"; ctx.fillStyle = "rgba(255,255,255,0.55)"; ctx.fillText("PAGES", rx + pad, ry + pad + fs(34) + fs(13));
@@ -604,7 +539,6 @@ function Bookmark() {
         ctx.font = "400 " + fs(10) + "px 'Helvetica Neue',Arial,sans-serif"; ctx.fillStyle = "rgba(255,255,255,0.7)"; ctx.fillText(selectedBook?.author_name?.[0] || "", midX, tsy + lines.length * fs(26) + fs(14));
         if (currentPage) { ctx.font = "400 " + fs(9) + "px 'Helvetica Neue',Arial,sans-serif"; ctx.fillStyle = "rgba(255,255,255,0.45)"; ctx.fillText("page " + currentPage, midX, tsy + lines.length * fs(26) + fs(28)); }
         ctx.font = "800 " + fs(8) + "px 'Helvetica Neue',Arial,sans-serif"; ctx.fillStyle = "rgba(255,255,255,0.6)"; ctx.fillText("BOOKMARK", midX, ry + ch - pad);
-
       } else if (selectedTemplate === "editorial") {
         ctx.textAlign = "left"; ctx.strokeStyle = "rgba(255,255,255,0.35)"; ctx.lineWidth = 1;
         ctx.beginPath(); ctx.moveTo(rx + pad, ry + pad); ctx.lineTo(rx + cw - pad, ry + pad); ctx.stroke();
@@ -622,7 +556,6 @@ function Bookmark() {
         }
         ctx.font = "600 " + fs(7) + "px 'Helvetica Neue',Arial,sans-serif"; ctx.fillStyle = "rgba(255,255,255,0.4)"; ctx.fillText("BOOKMARK", rx + pad, ry + ch - pad);
         ctx.textAlign = "right"; ctx.fillText(new Date().toLocaleDateString("en-US", { month:"short", day:"numeric", year:"numeric" }), rx + cw - pad, ry + ch - pad);
-
       } else if (selectedTemplate === "block") {
         ctx.textAlign = "left"; ctx.font = "900 " + fs(7) + "px 'Helvetica Neue',Arial,sans-serif"; ctx.fillStyle = "rgba(255,255,255,0.5)"; ctx.fillText("BOOKMARK", rx + pad, ry + pad + fs(7));
         ctx.font = "900 " + fs(20) + "px 'Helvetica Neue',Arial,sans-serif"; ctx.fillStyle = "#fff";
@@ -636,7 +569,6 @@ function Bookmark() {
         ctx.font = "900 " + fs(11) + "px 'Helvetica Neue',Arial,sans-serif"; ctx.fillStyle = "#fff"; ctx.fillText(statStr, rx + pad, ry + ch - pad - fs(12));
         ctx.font = "600 " + fs(7) + "px 'Helvetica Neue',Arial,sans-serif"; ctx.fillStyle = "rgba(255,255,255,0.4)"; ctx.fillText(new Date().toLocaleDateString("en-US", { month:"short", day:"numeric", year:"numeric" }).toUpperCase(), rx + pad, ry + ch - pad);
       }
-
       const link = document.createElement("a");
       link.download = "bookmark-" + (selectedBook?.title?.replace(/\s+/g, "-") || "session") + ".png";
       link.href = canvas.toDataURL("image/png"); link.click(); setExporting(false);
@@ -645,11 +577,7 @@ function Bookmark() {
     doRender(photo ? await loadImg(photo) : null);
   }, [photo, cardFormat, cardPos, cardScale, selectedTemplate, selectedBook, sessionTime, pagesRead, currentPage, bookFinished]);
 
-  // ══════════════════════════════════════════
-  // RENDER
-  // ══════════════════════════════════════════
-
-  // ── Loading splash ──
+  // ── Loading ──
   if (authLoading) return (
     <div style={{ ...S.app, display:"flex", alignItems:"center", justifyContent:"center" }}>
       <div style={{ textAlign:"center" }}>
@@ -659,7 +587,7 @@ function Bookmark() {
     </div>
   );
 
-  // ── Auth screen ──
+  // ── Auth ──
   if (!user || screen === SCREENS.AUTH) return (
     <div style={S.app}>
       <div style={{ padding:"64px 32px 0", textAlign:"center" }}>
@@ -695,7 +623,7 @@ function Bookmark() {
     </div>
   );
 
-  // ── Home screen ──
+  // ── Home ──
   if (screen === SCREENS.HOME) {
     const hasGoals = profile.goal_minutes > 0 || profile.goal_pages > 0;
     return (
@@ -712,7 +640,6 @@ function Bookmark() {
             <button onClick={handleSignOut} style={{ ...S.back, fontSize:12 }}>Sign out</button>
           </div>
         </div>
-
         <div style={{ padding:"0 22px 50px" }}>
           {hasGoals ? (
             <div style={{ ...S.card, display:"flex", alignItems:"center", gap:18, padding:"16px 18px", marginBottom:18 }}>
@@ -750,12 +677,10 @@ function Bookmark() {
               </div>
             </div>
           ) : <div style={{ marginBottom:16 }}/>}
-
           <button style={{ ...S.pBtn, marginTop:0, marginBottom:28, padding:"19px", fontSize:17 }}
             onClick={() => { setElapsed(0); setTimerRunning(false); setCountdownDone(false); setScreen(SCREENS.TIMER); }}>
             Begin Reading Session
           </button>
-
           {sessionsLoading ? (
             <div style={{ textAlign:"center", color:"rgba(255,255,255,0.2)", fontSize:13, padding:"40px 0" }}>Loading…</div>
           ) : sessions.length > 0 ? (
@@ -791,49 +716,41 @@ function Bookmark() {
     );
   }
 
-  // ── Goals screen ──
-  if (screen === SCREENS.GOALS) {
-    const [gMin, setGMin] = useState(String(profile.goal_minutes || ""));
-    const [gPg,  setGPg]  = useState(String(profile.goal_pages   || ""));
-    const [saving, setSaving] = useState(false);
-    const saveGoals = async () => {
-      setSaving(true);
-      await sb.from("profiles").upsert({ id: user.id, goal_minutes: parseInt(gMin) || 0, goal_pages: parseInt(gPg) || 0 });
-      await loadProfile(); setSaving(false); setScreen(SCREENS.HOME);
-    };
-    return (
-      <div style={S.app}>
-        <div style={S.hdr}>
-          <button style={S.back} onClick={() => setScreen(SCREENS.HOME)}>← Back</button>
-          <span style={S.sub}>Daily Goals</span>
-          <div style={{ width:56 }}/>
-        </div>
-        <div style={{ padding:"20px 28px 40px" }}>
-          <div style={{ fontSize:14, color:"rgba(255,255,255,0.35)", marginBottom:32, lineHeight:1.8 }}>
-            Set a daily reading goal. The rings on your home screen update as you read each day.
-          </div>
-          <div style={{ marginBottom:22 }}>
-            <label style={S.label}>DAILY TIME GOAL (MINUTES)</label>
-            <input style={S.inp} type="number" placeholder="e.g. 30" value={gMin} onChange={e => setGMin(e.target.value)}/>
-            <div style={{ fontSize:11, color:"rgba(255,255,255,0.2)", marginTop:6 }}>Set to 0 to disable.</div>
-          </div>
-          <div style={{ marginBottom:32 }}>
-            <label style={S.label}>DAILY PAGES GOAL</label>
-            <input style={S.inp} type="number" placeholder="e.g. 20" value={gPg} onChange={e => setGPg(e.target.value)}/>
-            <div style={{ fontSize:11, color:"rgba(255,255,255,0.2)", marginTop:6 }}>Set to 0 to disable.</div>
-          </div>
-          <div style={{ padding:"20px 20px", background:"rgba(255,255,255,0.03)", borderRadius:14, border:"1px solid rgba(255,255,255,0.06)", marginBottom:28 }}>
-            <div style={{ fontSize:10, letterSpacing:3, color:"rgba(255,255,255,0.25)", marginBottom:10 }}>CURRENT STREAK</div>
-            <div style={{ fontSize:42, fontWeight:800, letterSpacing:-2, lineHeight:1 }}>{profile.streak}</div>
-            <div style={{ fontSize:12, color:"rgba(255,255,255,0.3)", marginTop:5 }}>consecutive day{profile.streak !== 1 ? "s" : ""} read</div>
-          </div>
-          <button style={{ ...S.pBtn, marginTop:0, opacity: saving ? 0.6 : 1 }} onClick={saveGoals} disabled={saving}>{saving ? "Saving…" : "Save Goals"}</button>
-        </div>
+  // ── Goals ──
+  if (screen === SCREENS.GOALS) return (
+    <div style={S.app}>
+      <div style={S.hdr}>
+        <button style={S.back} onClick={() => setScreen(SCREENS.HOME)}>← Back</button>
+        <span style={S.sub}>Daily Goals</span>
+        <div style={{ width:56 }}/>
       </div>
-    );
-  }
+      <div style={{ padding:"20px 28px 40px" }}>
+        <div style={{ fontSize:14, color:"rgba(255,255,255,0.35)", marginBottom:32, lineHeight:1.8 }}>
+          Set a daily reading goal. The rings on your home screen update as you read each day.
+        </div>
+        <div style={{ marginBottom:22 }}>
+          <label style={S.label}>DAILY TIME GOAL (MINUTES)</label>
+          <input style={S.inp} type="number" placeholder="e.g. 30" value={gMin} onChange={e => setGMin(e.target.value)}/>
+          <div style={{ fontSize:11, color:"rgba(255,255,255,0.2)", marginTop:6 }}>Set to 0 to disable.</div>
+        </div>
+        <div style={{ marginBottom:32 }}>
+          <label style={S.label}>DAILY PAGES GOAL</label>
+          <input style={S.inp} type="number" placeholder="e.g. 20" value={gPg} onChange={e => setGPg(e.target.value)}/>
+          <div style={{ fontSize:11, color:"rgba(255,255,255,0.2)", marginTop:6 }}>Set to 0 to disable.</div>
+        </div>
+        <div style={{ padding:"20px", background:"rgba(255,255,255,0.03)", borderRadius:14, border:"1px solid rgba(255,255,255,0.06)", marginBottom:28 }}>
+          <div style={{ fontSize:10, letterSpacing:3, color:"rgba(255,255,255,0.25)", marginBottom:10 }}>CURRENT STREAK</div>
+          <div style={{ fontSize:42, fontWeight:800, letterSpacing:-2, lineHeight:1 }}>{profile.streak}</div>
+          <div style={{ fontSize:12, color:"rgba(255,255,255,0.3)", marginTop:5 }}>consecutive day{profile.streak !== 1 ? "s" : ""} read</div>
+        </div>
+        <button style={{ ...S.pBtn, marginTop:0, opacity: goalsSaving ? 0.6 : 1 }} onClick={saveGoals} disabled={goalsSaving}>
+          {goalsSaving ? "Saving…" : "Save Goals"}
+        </button>
+      </div>
+    </div>
+  );
 
-  // ── Timer screen ──
+  // ── Timer ──
   if (screen === SCREENS.TIMER) {
     const isCD = timerMode === "countdown";
     const dispSec = isCD ? countdownLeft : elapsed;
@@ -848,7 +765,6 @@ function Bookmark() {
           <div style={{ width:56 }}/>
         </div>
         <div style={{ padding:"0 22px 40px", display:"flex", flexDirection:"column", minHeight:"calc(100vh - 70px)" }}>
-
           {!sessionActive && !countdownDone && (
             <div style={{ display:"flex", gap:6, marginBottom:20, background:"rgba(255,255,255,0.05)", borderRadius:12, padding:4 }}>
               {[["stopwatch","Stopwatch"],["countdown","Countdown"]].map(([m, label]) => (
@@ -861,7 +777,6 @@ function Bookmark() {
               ))}
             </div>
           )}
-
           {isCD && !sessionActive && !countdownDone && (
             <div style={{ marginBottom:20 }}>
               <div style={{ ...S.label, textAlign:"center" }}>SET DURATION (MINUTES)</div>
@@ -885,7 +800,6 @@ function Bookmark() {
               </div>
             </div>
           )}
-
           {!sessionActive && !countdownDone && (
             <div style={{ marginBottom:20 }}>
               <div style={{ borderRadius:14, border:"1px solid rgba(255,255,255,0.07)", overflow:"hidden", marginBottom:12 }}>
@@ -938,7 +852,6 @@ function Bookmark() {
               <input style={S.inp} type="number" placeholder="What page are you starting on?" value={startingPage} onChange={e => setStartingPage(e.target.value)}/>
             </div>
           )}
-
           {countdownDone && (
             <div style={{ background:"rgba(255,255,255,0.06)", border:"1px solid rgba(255,255,255,0.12)", borderRadius:16, padding:"16px 20px", marginBottom:20, textAlign:"center" }}>
               <div style={{ fontWeight:700, fontSize:17, marginBottom:4 }}>Time's up!</div>
@@ -953,7 +866,6 @@ function Bookmark() {
               </div>
             </div>
           )}
-
           <div style={{ display:"flex", justifyContent:"center", alignItems:"center", flex:1, marginBottom:24, marginTop: sessionActive ? 0 : 8 }}>
             <div style={{ position:"relative", display:"inline-flex", alignItems:"center", justifyContent:"center" }}>
               <svg width={240} height={240} style={{ transform:"rotate(-90deg)" }}>
@@ -971,7 +883,6 @@ function Bookmark() {
               </div>
             </div>
           </div>
-
           {!countdownDone && (
             <div style={{ display:"flex", gap:12, marginBottom:12 }}>
               <button onClick={() => setTimerRunning(!timerRunning)}
@@ -993,7 +904,6 @@ function Bookmark() {
             <button style={{ ...S.gBtn, marginTop:0, color:"rgba(255,255,255,0.3)", fontSize:13 }}
               onClick={() => { setElapsed(0); setTimerRunning(false); if (isCD) setCountdownLeft(countdownSet); }}>Reset</button>
           )}
-
           {!sessionActive && (
             <div style={{ marginTop:24, padding:"16px 18px", background:"rgba(255,255,255,0.03)", borderRadius:14, border:"1px solid rgba(255,255,255,0.06)" }}>
               <div style={{ fontSize:12, color:"rgba(255,255,255,0.45)", lineHeight:1.7, fontStyle:"italic", marginBottom:6 }}>"{quote.text}"</div>
@@ -1005,7 +915,7 @@ function Bookmark() {
     );
   }
 
-  // ── Camera / Log screen ──
+  // ── Camera ──
   if (screen === SCREENS.CAMERA) return (
     <div style={S.app}>
       <div style={S.hdr}>
@@ -1046,7 +956,7 @@ function Bookmark() {
         </div>
         <label style={{ ...S.label, marginBottom:12 }}>BACKGROUND PHOTO</label>
         <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" onChange={handlePhotoUpload} style={{ display:"none" }}/>
-        <input ref={fileInputRef}   type="file" accept="image/*" onChange={handlePhotoUpload} style={{ display:"none" }}/>
+        <input ref={fileInputRef} type="file" accept="image/*" onChange={handlePhotoUpload} style={{ display:"none" }}/>
         <button style={{ ...S.pBtn, marginTop:0 }} onClick={() => cameraInputRef.current.click()}>Take Photo</button>
         <button style={S.gBtn} onClick={() => fileInputRef.current.click()}>Choose from Library</button>
         <button style={{ ...S.gBtn, color:"rgba(255,255,255,0.35)", fontSize:13 }}
@@ -1057,7 +967,7 @@ function Bookmark() {
     </div>
   );
 
-  // ── Compose screen ──
+  // ── Compose ──
   if (screen === SCREENS.COMPOSE) {
     const isStory = cardFormat === "story";
     const previewW = 382, previewH = isStory ? Math.round(previewW * (16 / 9)) : previewW;
@@ -1131,47 +1041,4 @@ function Bookmark() {
   return null;
 }
 
-// ── Goals screen ──
-  if (screen === SCREENS.GOALS) {
-    const saveGoals = async () => {
-      setGoalsSaving(true);
-      await sb.from("profiles").upsert({ id: user.id, goal_minutes: parseInt(gMin) || 0, goal_pages: parseInt(gPg) || 0 });
-      await loadProfile(); setGoalsSaving(false); setScreen(SCREENS.HOME);
-    };
-    return (
-      <div style={S.app}>
-        <div style={S.hdr}>
-          <button style={S.back} onClick={() => setScreen(SCREENS.HOME)}>← Back</button>
-          <span style={S.sub}>Daily Goals</span>
-          <div style={{ width:56 }}/>
-        </div>
-        <div style={{ padding:"20px 28px 40px" }}>
-          <div style={{ fontSize:14, color:"rgba(255,255,255,0.35)", marginBottom:32, lineHeight:1.8 }}>
-            Set a daily reading goal. The rings on your home screen update as you read each day.
-          </div>
-          <div style={{ marginBottom:22 }}>
-            <label style={S.label}>DAILY TIME GOAL (MINUTES)</label>
-            <input style={S.inp} type="number" placeholder="e.g. 30" value={gMin} onChange={e => setGMin(e.target.value)}/>
-            <div style={{ fontSize:11, color:"rgba(255,255,255,0.2)", marginTop:6 }}>Set to 0 to disable.</div>
-          </div>
-          <div style={{ marginBottom:32 }}>
-            <label style={S.label}>DAILY PAGES GOAL</label>
-            <input style={S.inp} type="number" placeholder="e.g. 20" value={gPg} onChange={e => setGPg(e.target.value)}/>
-            <div style={{ fontSize:11, color:"rgba(255,255,255,0.2)", marginTop:6 }}>Set to 0 to disable.</div>
-          </div>
-          <div style={{ padding:"20px 20px", background:"rgba(255,255,255,0.03)", borderRadius:14, border:"1px solid rgba(255,255,255,0.06)", marginBottom:28 }}>
-            <div style={{ fontSize:10, letterSpacing:3, color:"rgba(255,255,255,0.25)", marginBottom:10 }}>CURRENT STREAK</div>
-            <div style={{ fontSize:42, fontWeight:800, letterSpacing:-2, lineHeight:1 }}>{profile.streak}</div>
-            <div style={{ fontSize:12, color:"rgba(255,255,255,0.3)", marginTop:5 }}>consecutive day{profile.streak !== 1 ? "s" : ""} read</div>
-          </div>
-          <button style={{ ...S.pBtn, marginTop:0, opacity: goalsSaving ? 0.6 : 1 }} onClick={saveGoals} disabled={goalsSaving}>
-            {goalsSaving ? "Saving…" : "Save Goals"}
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  return null;
-}
 ReactDOM.createRoot(document.getElementById("root")).render(<Bookmark/>);
