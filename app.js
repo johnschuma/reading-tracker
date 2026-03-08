@@ -9,7 +9,7 @@ const { useState, useEffect, useRef, useCallback } = React;
 const { createClient } = supabase;
 const sb = createClient(SUPABASE_URL, SUPABASE_ANON);
 
-const SCREENS = { AUTH:"auth", HOME:"home", TIMER:"timer", CAMERA:"camera", COMPOSE:"compose", GOALS:"goals", HISTORY:"history" };
+const SCREENS = { AUTH:"auth", HOME:"home", TIMER:"timer", CAMERA:"camera", COMPOSE:"compose", GOALS:"goals", HISTORY:"history", ACCOUNT:"account" };
 
 const QUOTES = [
   { text:"A reader lives a thousand lives before he dies. The man who never reads lives only one.", author:"George R.R. Martin" },
@@ -267,14 +267,13 @@ function BottomNav({ screen, setScreen, onStartTimer }) {
         </svg>
         <span style={activeLabel(SCREENS.GOALS)}>Goals</span>
       </button>
-      {/* Timer (settings) */}
-      <button style={navBtn(SCREENS.TIMER)} onClick={() => setScreen(SCREENS.TIMER)}>
+      {/* Account */}
+      <button style={navBtn(SCREENS.ACCOUNT)} onClick={() => setScreen(SCREENS.ACCOUNT)}>
         <svg width={22} height={22} viewBox="0 0 24 24" fill="none">
-          <circle cx="12" cy="13" r="8" stroke={active(SCREENS.TIMER)} strokeWidth="1.8"/>
-          <path d="M12 9V13L15 15" stroke={active(SCREENS.TIMER)} strokeWidth="1.8" strokeLinecap="round"/>
-          <path d="M9 2H15" stroke={active(SCREENS.TIMER)} strokeWidth="1.8" strokeLinecap="round"/>
+          <circle cx="12" cy="8" r="4" stroke={active(SCREENS.ACCOUNT)} strokeWidth="1.8"/>
+          <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" stroke={active(SCREENS.ACCOUNT)} strokeWidth="1.8" strokeLinecap="round"/>
         </svg>
-        <span style={activeLabel(SCREENS.TIMER)}>Timer</span>
+        <span style={activeLabel(SCREENS.ACCOUNT)}>Account</span>
       </button>
     </div>
   );
@@ -296,8 +295,14 @@ function Bookmark() {
   const [gMin, setGMin]                         = useState("");
   const [gPg, setGPg]                           = useState("");
   const [goalsSaving, setGoalsSaving]           = useState(false);
-  const [goalsTab, setGoalsTab]                 = useState("goals");
-  const [statsRange, setStatsRange]             = useState("monthly");
+  const [goalsList, setGoalsList]               = useState(() => { try { return JSON.parse(localStorage.getItem("bm_goals") || "[]"); } catch { return []; } });
+  const [showAddGoal, setShowAddGoal]           = useState(false);
+  const [newGoalType, setNewGoalType]           = useState("time");
+  const [newGoalValue, setNewGoalValue]         = useState("");
+  const [goalsTab, setGoalsTab]                 = useState("stats");
+  const [statsRange, setStatsRange]             = useState("28days");
+  const [customFrom, setCustomFrom]             = useState("");
+  const [customTo, setCustomTo]                 = useState("");
 
   const [sessions, setSessions]                 = useState([]);
   const [sessionsLoading, setSessionsLoading]   = useState(false);
@@ -681,55 +686,95 @@ function Bookmark() {
 
   // ── Home ──
   if (screen === SCREENS.HOME) {
-    const hasGoals = profile.goal_minutes > 0 || profile.goal_pages > 0;
+    const hasGoals = profile.goal_minutes > 0 || profile.goal_pages > 0 || goalsList.length > 0;
+    const firstName = user?.email?.split("@")[0]?.split(".")[0] || "";
+    const displayName = firstName.charAt(0).toUpperCase() + firstName.slice(1);
     return (
-      <div style={{ ...S.app, paddingBottom:80 }}>
+      <div style={{ ...S.app, paddingBottom:90, overflowX:"hidden" }}>
         {showStreakModal && <StreakModal streak={newStreak} onClose={() => setShowStreakModal(false)}/>}
 
         {/* ── Top bar ── */}
-        <div style={S.hdr}>
-          <div style={{ display:"flex", alignItems:"center", gap:8 }}>
-            <LogoMark size={22} color="rgba(255,255,255,0.7)"/>
-            <span style={S.logoText}>BOOKMARK</span>
+        <div style={{ padding:"22px 22px 8px", display:"flex", alignItems:"flex-start", justifyContent:"space-between" }}>
+          <div>
+            <div style={{ fontSize:13, color:"rgba(255,255,255,0.35)", letterSpacing:0.3, marginBottom:2 }}>
+              {displayName ? `${displayName}, what are you reading today?` : "What are you reading today?"}
+            </div>
+            <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+              <LogoMark size={18} color="rgba(255,255,255,0.5)"/>
+              <span style={{ ...S.logoText, fontSize:17 }}>BOOKMARK</span>
+            </div>
           </div>
-          <div style={{ display:"flex", alignItems:"center", gap:12 }}>
-            {profile.streak > 0 && (
-              <div style={{ fontSize:12, color:"rgba(255,255,255,0.4)", letterSpacing:0.5 }}>{profile.streak}d</div>
-            )}
-            <button onClick={handleSignOut} style={{ ...S.back, fontSize:12 }}>Sign out</button>
-          </div>
+          {profile.streak > 0 && (
+            <div style={{ textAlign:"center", paddingTop:2 }}>
+              <div style={{ fontSize:18, fontWeight:800, letterSpacing:-1, color:"#fff", lineHeight:1 }}>{profile.streak}</div>
+              <div style={{ fontSize:8, letterSpacing:2, color:"rgba(255,255,255,0.3)", textTransform:"uppercase" }}>day streak</div>
+            </div>
+          )}
         </div>
 
         <div style={{ padding:"0 22px" }}>
 
-          {/* ── Fitness rings ── */}
+          {/* ── Minimal tap-to-read circle ── */}
+          <div style={{ display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", paddingTop:8, paddingBottom:8 }}>
+            <div
+              onClick={() => { setElapsed(0); setTimerRunning(false); setCountdownDone(false); setScreen(SCREENS.TIMER); }}
+              style={{ position:"relative", cursor:"pointer", userSelect:"none", width:220, height:220, display:"flex", alignItems:"center", justifyContent:"center" }}>
+              {/* minimal circle border */}
+              <svg width={220} height={220} style={{ position:"absolute", inset:0 }}>
+                <circle cx={110} cy={110} r={106} fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth={1}/>
+                <circle cx={110} cy={110} r={94} fill="none" stroke="rgba(255,255,255,0.04)" strokeWidth={1}/>
+              </svg>
+              {/* book + timer icon composite */}
+              <div style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:10 }}>
+                <div style={{ position:"relative", display:"inline-flex" }}>
+                  {/* book icon */}
+                  <svg width={44} height={44} viewBox="0 0 28 28" fill="none">
+                    <path d="M14 3 C13 3 7 3.5 7 8 L7 25 C9.5 23.5 12 23 14 25 C16 23 18.5 23.5 21 25 L21 8 C21 3.5 15 3 14 3Z" stroke="rgba(255,255,255,0.7)" strokeWidth="1.6" strokeLinejoin="round" fill="none"/>
+                    <path d="M14 3 L14 25" stroke="rgba(255,255,255,0.25)" strokeWidth="1" strokeDasharray="2 2"/>
+                    <path d="M9 10 L12.5 10 M9 13.5 L12.5 13.5 M9 17 L12.5 17" stroke="rgba(255,255,255,0.4)" strokeWidth="1.2" strokeLinecap="round"/>
+                  </svg>
+                  {/* timer badge */}
+                  <div style={{ position:"absolute", top:-6, right:-10, width:20, height:20, borderRadius:"50%", background:"rgba(255,255,255,0.12)", border:"1px solid rgba(255,255,255,0.2)", display:"flex", alignItems:"center", justifyContent:"center" }}>
+                    <svg width={11} height={11} viewBox="0 0 24 24" fill="none">
+                      <circle cx="12" cy="13" r="8" stroke="rgba(255,255,255,0.8)" strokeWidth="2"/>
+                      <path d="M12 9V13L14.5 15" stroke="rgba(255,255,255,0.8)" strokeWidth="2" strokeLinecap="round"/>
+                      <path d="M9 2H15" stroke="rgba(255,255,255,0.8)" strokeWidth="2" strokeLinecap="round"/>
+                    </svg>
+                  </div>
+                </div>
+                <div style={{ fontSize:10, letterSpacing:4, color:"rgba(255,255,255,0.4)", textTransform:"uppercase" }}>TAP TO READ</div>
+              </div>
+            </div>
+          </div>
+
+          {/* ── Today progress (below timer) ── */}
           {hasGoals && (
-            <div style={{ ...S.card, display:"flex", alignItems:"center", gap:18, padding:"16px 18px", marginBottom:18 }}>
-              <div style={{ position:"relative", flexShrink:0, width:90, height:90 }}>
-                <FitnessRings minutesPct={minutesPct} pagesPct={pagesPct} size={90}/>
+            <div style={{ ...S.card, display:"flex", alignItems:"center", gap:18, padding:"16px 18px", marginBottom:6 }}>
+              <div style={{ position:"relative", flexShrink:0, width:80, height:80 }}>
+                <FitnessRings minutesPct={minutesPct} pagesPct={pagesPct} size={80}/>
                 <div style={{ position:"absolute", inset:0, display:"flex", alignItems:"center", justifyContent:"center", flexDirection:"column" }}>
-                  <div style={{ fontSize:12, fontWeight:700, color:"#fff", lineHeight:1 }}>{todayTotals.mins}m</div>
-                  <div style={{ fontSize:9, color:"rgba(255,255,255,0.3)", marginTop:2 }}>{todayTotals.pgs}pg</div>
+                  <div style={{ fontSize:11, fontWeight:700, color:"#fff", lineHeight:1 }}>{todayTotals.mins}m</div>
+                  <div style={{ fontSize:8, color:"rgba(255,255,255,0.3)", marginTop:1 }}>{todayTotals.pgs}pg</div>
                 </div>
               </div>
               <div style={{ flex:1 }}>
-                <div style={{ fontSize:10, letterSpacing:2, color:"rgba(255,255,255,0.25)", marginBottom:10 }}>TODAY</div>
-                {profile.goal_minutes > 0 && (
-                  <div style={{ marginBottom:9 }}>
-                    <div style={{ display:"flex", justifyContent:"space-between", fontSize:11, marginBottom:4 }}>
+                <div style={{ fontSize:9, letterSpacing:2, color:"rgba(255,255,255,0.25)", marginBottom:8 }}>TODAY</div>
+                {(profile.goal_minutes > 0 || goalsList.some(g=>g.type==="time")) && (
+                  <div style={{ marginBottom:7 }}>
+                    <div style={{ display:"flex", justifyContent:"space-between", fontSize:11, marginBottom:3 }}>
                       <span style={{ color:"rgba(255,255,255,0.5)" }}>Time</span>
-                      <span style={{ color:"#fff", fontWeight:600 }}>{todayTotals.mins} / {profile.goal_minutes} min</span>
+                      <span style={{ color:"#fff", fontWeight:600 }}>{todayTotals.mins} / {profile.goal_minutes || (goalsList.find(g=>g.type==="time")?.value||0)} min</span>
                     </div>
                     <div style={{ height:2, background:"rgba(255,255,255,0.07)", borderRadius:2 }}>
                       <div style={{ height:"100%", width: Math.min(100, minutesPct * 100) + "%", background:"#fff", borderRadius:2, transition:"width 0.6s" }}/>
                     </div>
                   </div>
                 )}
-                {profile.goal_pages > 0 && (
+                {(profile.goal_pages > 0 || goalsList.some(g=>g.type==="pages")) && (
                   <div>
-                    <div style={{ display:"flex", justifyContent:"space-between", fontSize:11, marginBottom:4 }}>
+                    <div style={{ display:"flex", justifyContent:"space-between", fontSize:11, marginBottom:3 }}>
                       <span style={{ color:"rgba(255,255,255,0.5)" }}>Pages</span>
-                      <span style={{ color:"rgba(255,255,255,0.5)", fontWeight:600 }}>{todayTotals.pgs} / {profile.goal_pages} pg</span>
+                      <span style={{ color:"rgba(255,255,255,0.5)", fontWeight:600 }}>{todayTotals.pgs} / {profile.goal_pages || (goalsList.find(g=>g.type==="pages")?.value||0)} pg</span>
                     </div>
                     <div style={{ height:2, background:"rgba(255,255,255,0.07)", borderRadius:2 }}>
                       <div style={{ height:"100%", width: Math.min(100, pagesPct * 100) + "%", background:"rgba(255,255,255,0.45)", borderRadius:2, transition:"width 0.6s" }}/>
@@ -739,36 +784,6 @@ function Bookmark() {
               </div>
             </div>
           )}
-
-          {/* ── Big circle timer focal point ── */}
-          <div style={{ display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", paddingTop:10, paddingBottom:16 }}>
-            <div
-              onClick={() => { setElapsed(0); setTimerRunning(false); setCountdownDone(false); setScreen(SCREENS.TIMER); }}
-              style={{ position:"relative", cursor:"pointer", userSelect:"none" }}>
-              {/* outer glow ring */}
-              <svg width={280} height={280} style={{ transform:"rotate(-90deg)", display:"block" }}>
-                <circle cx={140} cy={140} r={126} fill="none" stroke="rgba(255,255,255,0.04)" strokeWidth={2}/>
-                <circle cx={140} cy={140} r={118} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth={1}/>
-              </svg>
-              {/* inner content */}
-              <div style={{ position:"absolute", inset:0, display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center" }}>
-                <div style={{ fontSize:11, letterSpacing:4, color:"rgba(255,255,255,0.2)", textTransform:"uppercase", marginBottom:12 }}>
-                  {elapsed > 0 ? "paused" : "reading"}
-                </div>
-                <div style={{ fontSize:52, fontWeight:300, letterSpacing:-2, lineHeight:1, fontFamily:"'Times New Roman',Times,serif", color:"#fff" }}>
-                  {fmt(elapsed > 0 ? elapsed : 0)}
-                </div>
-                <div style={{ marginTop:24, width:52, height:52, borderRadius:"50%", background: elapsed > 0 ? "rgba(255,255,255,0.1)" : "linear-gradient(135deg,#fff,#aaa)", display:"flex", alignItems:"center", justifyContent:"center", border: elapsed > 0 ? "1px solid rgba(255,255,255,0.2)" : "none" }}>
-                  <svg width={16} height={16} viewBox="0 0 18 18" fill="none">
-                    <path d="M5 3.5L14.5 9L5 14.5V3.5Z" fill={elapsed > 0 ? "#fff" : "#000"}/>
-                  </svg>
-                </div>
-              </div>
-            </div>
-            <div style={{ fontSize:10, letterSpacing:2, color:"rgba(255,255,255,0.15)", marginTop:4, textTransform:"uppercase" }}>
-              tap to {elapsed > 0 ? "resume" : "begin"}
-            </div>
-          </div>
         </div>
 
         <BottomNav screen={screen} setScreen={setScreen} onStartTimer={() => { setElapsed(0); setTimerRunning(false); setCountdownDone(false); setScreen(SCREENS.TIMER); }}/>
@@ -776,69 +791,171 @@ function Bookmark() {
     );
   }
 
-  // ── Goals ──
+  // ── Goals & Stats ──
   if (screen === SCREENS.GOALS) {
-    // compute stats from sessions
     const now = new Date();
+    // Build 28-day default range
+    const past28From = new Date(now); past28From.setDate(past28From.getDate() - 27);
+    const past28FromStr = past28From.toISOString().slice(0,10);
+
     const rangeFilter = s => {
-      const d = new Date(s.created_at);
-      if (statsRange === "daily") return d.toISOString().slice(0,10) === todayStr();
-      if (statsRange === "monthly") { return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth(); }
-      return d.getFullYear() === now.getFullYear();
+      const ds = s.created_at?.slice(0,10) || "";
+      if (statsRange === "28days") return ds >= past28FromStr;
+      if (statsRange === "monthly") { const d=new Date(s.created_at); return d.getFullYear()===now.getFullYear()&&d.getMonth()===now.getMonth(); }
+      if (statsRange === "yearly") { return new Date(s.created_at).getFullYear()===now.getFullYear(); }
+      if (statsRange === "custom") {
+        if (customFrom && customTo) return ds >= customFrom && ds <= customTo;
+        if (customFrom) return ds >= customFrom;
+        if (customTo) return ds <= customTo;
+        return true;
+      }
+      return true;
     };
     const filtered = sessions.filter(rangeFilter);
     const totalMins = Math.round(filtered.reduce((a,s) => a + (s.time_secs||0), 0) / 60);
     const totalPages = filtered.reduce((a,s) => a + (s.pages_read||0), 0);
-    const totalBooks = new Set(filtered.filter(s=>s.book?.title).map(s=>s.book.title+(s.finished?"_done":""))).size;
     const totalFinished = filtered.filter(s=>s.finished).length;
     const uniqueDays = new Set(filtered.map(s=>s.created_at?.slice(0,10))).size;
 
-    // chart data: last N periods
-    const chartData = (() => {
-      if (statsRange === "daily") {
-        // last 7 days hour-by-hour summary → just show per-hour sessions today
-        const hours = Array.from({length:24}, (_,i) => ({ label: i%6===0 ? i+"h" : "", value:0 }));
-        sessions.filter(s=>s.created_at?.slice(0,10)===todayStr()).forEach(s => {
-          const h = new Date(s.created_at).getHours();
-          hours[h].value += Math.round((s.time_secs||0)/60);
-        });
-        return hours;
-      } else if (statsRange === "monthly") {
-        const days = new Date(now.getFullYear(), now.getMonth()+1, 0).getDate();
-        const arr = Array.from({length:days}, (_,i) => ({ label: (i+1)%7===1 ? String(i+1) : "", value:0 }));
-        sessions.filter(s=>{ const d=new Date(s.created_at); return d.getFullYear()===now.getFullYear()&&d.getMonth()===now.getMonth(); }).forEach(s => {
-          const day = new Date(s.created_at).getDate()-1;
-          arr[day].value += Math.round((s.time_secs||0)/60);
-        });
-        return arr;
-      } else {
-        const arr = Array.from({length:12}, (_,i) => ({ label:["J","F","M","A","M","J","J","A","S","O","N","D"][i], value:0 }));
-        sessions.filter(s=>new Date(s.created_at).getFullYear()===now.getFullYear()).forEach(s => {
-          const m = new Date(s.created_at).getMonth();
-          arr[m].value += Math.round((s.time_secs||0)/60);
-        });
-        return arr;
-      }
-    })();
-    const maxVal = Math.max(...chartData.map(d=>d.value), 1);
+    // Build 28-day daily chart buckets (always 28 bars for "28days" default)
+    const build28 = (metric) => {
+      return Array.from({length:28}, (_,i) => {
+        const d = new Date(past28From); d.setDate(d.getDate()+i);
+        const ds = d.toISOString().slice(0,10);
+        const daySessions = sessions.filter(s=>s.created_at?.slice(0,10)===ds);
+        let value = 0;
+        if (metric==="minutes") value = Math.round(daySessions.reduce((a,s)=>a+(s.time_secs||0),0)/60);
+        else if (metric==="pages") value = daySessions.reduce((a,s)=>a+(s.pages_read||0),0);
+        else if (metric==="sessions") value = daySessions.length;
+        else if (metric==="days") value = daySessions.length > 0 ? 1 : 0;
+        const dow = ["S","M","T","W","T","F","S"][d.getDay()];
+        const showLabel = i===0||i===6||i===13||i===20||i===27;
+        return { label: showLabel ? (d.getMonth()+1)+"/"+(d.getDate()) : "", value, ds, hasActivity: daySessions.length>0 };
+      });
+    };
 
-    const statCards = [
-      { label:"Minutes", value: totalMins },
-      { label:"Pages", value: totalPages },
-      { label:"Sessions", value: filtered.length },
-      { label:"Books finished", value: totalFinished },
-      { label:"Days read", value: uniqueDays },
+    const buildCustom = (metric) => {
+      const from = customFrom ? new Date(customFrom) : past28From;
+      const to   = customTo   ? new Date(customTo)   : now;
+      const diffDays = Math.min(90, Math.round((to - from) / 86400000) + 1);
+      return Array.from({length:diffDays}, (_,i) => {
+        const d = new Date(from); d.setDate(d.getDate()+i);
+        const ds = d.toISOString().slice(0,10);
+        const daySessions = sessions.filter(s=>s.created_at?.slice(0,10)===ds);
+        let value = 0;
+        if (metric==="minutes") value = Math.round(daySessions.reduce((a,s)=>a+(s.time_secs||0),0)/60);
+        else if (metric==="pages") value = daySessions.reduce((a,s)=>a+(s.pages_read||0),0);
+        else if (metric==="sessions") value = daySessions.length;
+        else if (metric==="days") value = daySessions.length > 0 ? 1 : 0;
+        return { label: i===0||i===diffDays-1||i%7===0 ? (d.getMonth()+1)+"/"+(d.getDate()) : "", value, ds, hasActivity: daySessions.length>0 };
+      });
+    };
+
+    const buildMonthly = (metric) => {
+      const days = new Date(now.getFullYear(), now.getMonth()+1, 0).getDate();
+      return Array.from({length:days}, (_,i) => {
+        const d = new Date(now.getFullYear(), now.getMonth(), i+1);
+        const ds = d.toISOString().slice(0,10);
+        const daySessions = sessions.filter(s=>s.created_at?.slice(0,10)===ds);
+        let value = 0;
+        if (metric==="minutes") value = Math.round(daySessions.reduce((a,s)=>a+(s.time_secs||0),0)/60);
+        else if (metric==="pages") value = daySessions.reduce((a,s)=>a+(s.pages_read||0),0);
+        else if (metric==="sessions") value = daySessions.length;
+        else if (metric==="days") value = daySessions.length > 0 ? 1 : 0;
+        return { label: (i+1)%7===1 ? String(i+1) : "", value, ds, hasActivity: daySessions.length>0 };
+      });
+    };
+
+    const buildYearly = (metric) => {
+      const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+      return Array.from({length:12}, (_,m) => {
+        const monthSessions = sessions.filter(s=>{ const d=new Date(s.created_at); return d.getFullYear()===now.getFullYear()&&d.getMonth()===m; });
+        let value = 0;
+        if (metric==="minutes") value = Math.round(monthSessions.reduce((a,s)=>a+(s.time_secs||0),0)/60);
+        else if (metric==="pages") value = monthSessions.reduce((a,s)=>a+(s.pages_read||0),0);
+        else if (metric==="sessions") value = monthSessions.length;
+        else if (metric==="days") value = new Set(monthSessions.map(s=>s.created_at?.slice(0,10))).size;
+        return { label: MONTHS[m].slice(0,1), value, hasActivity: monthSessions.length>0 };
+      });
+    };
+
+    const getChartData = (metric) => {
+      if (statsRange==="28days") return build28(metric);
+      if (statsRange==="monthly") return buildMonthly(metric);
+      if (statsRange==="yearly") return buildYearly(metric);
+      return buildCustom(metric);
+    };
+
+    const MiniBarChart = ({ metric, label, total, unit="" }) => {
+      const data = getChartData(metric);
+      const maxV = Math.max(...data.map(d=>d.value), 1);
+      const hasAny = data.some(d=>d.value>0);
+      return (
+        <div style={{ background:"rgba(255,255,255,0.03)", border:"1px solid rgba(255,255,255,0.06)", borderRadius:18, padding:"18px 18px 14px", marginBottom:14 }}>
+          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:14 }}>
+            <div>
+              <div style={{ fontSize:10, letterSpacing:2, color:"rgba(255,255,255,0.35)", marginBottom:4 }}>{label.toUpperCase()}</div>
+              <div style={{ fontSize:34, fontWeight:800, letterSpacing:-2, lineHeight:1, color:"#fff" }}>{total.toLocaleString()}<span style={{ fontSize:14, fontWeight:400, color:"rgba(255,255,255,0.4)", letterSpacing:0, marginLeft:4 }}>{unit}</span></div>
+            </div>
+            {!hasAny && <div style={{ fontSize:11, color:"rgba(255,255,255,0.2)", fontStyle:"italic", paddingTop:8 }}>no data</div>}
+          </div>
+          <div style={{ display:"flex", alignItems:"flex-end", gap:2, height:60 }}>
+            {data.map((d,i) => (
+              <div key={i} style={{ flex:1, display:"flex", flexDirection:"column", alignItems:"center" }}>
+                <div style={{ width:"100%", borderRadius:"2px 2px 0 0", transition:"height 0.5s",
+                  background: d.value > 0 ? (d.hasActivity ? "rgba(255,255,255,0.85)" : "rgba(255,255,255,0.3)") : "rgba(255,255,255,0.06)",
+                  height: d.value > 0 ? Math.max(3, (d.value/maxV)*54) : 3 }}/>
+              </div>
+            ))}
+          </div>
+          <div style={{ display:"flex", marginTop:5 }}>
+            {data.map((d,i) => (
+              <div key={i} style={{ flex:1, textAlign:"center" }}>
+                {d.label && <span style={{ fontSize:7, color:"rgba(255,255,255,0.2)" }}>{d.label}</span>}
+              </div>
+            ))}
+          </div>
+        </div>
+      );
+    };
+
+    // Goals tab helpers
+    const allGoals = [
+      ...(profile.goal_minutes > 0 ? [{ id:"legacy_time", type:"time", value:profile.goal_minutes, label:"Daily Time Goal", unit:"min", legacy:true }] : []),
+      ...(profile.goal_pages > 0   ? [{ id:"legacy_pages", type:"pages", value:profile.goal_pages, label:"Daily Pages Goal", unit:"pages", legacy:true }] : []),
+      ...goalsList,
     ];
+    const goalTypeLabel = t => t==="time" ? "Daily Time (min)" : t==="pages" ? "Daily Pages" : "Custom";
+
+    const addGoal = () => {
+      if (!newGoalValue || parseInt(newGoalValue) <= 0) return;
+      const g = { id: Date.now().toString(), type: newGoalType, value: parseInt(newGoalValue), label: goalTypeLabel(newGoalType) };
+      const updated = [...goalsList, g];
+      setGoalsList(updated);
+      try { localStorage.setItem("bm_goals", JSON.stringify(updated)); } catch {}
+      // also persist to profile if time or pages
+      if (newGoalType==="time") { setGMin(newGoalValue); }
+      if (newGoalType==="pages") { setGPg(newGoalValue); }
+      setNewGoalValue(""); setShowAddGoal(false);
+    };
+
+    const removeGoal = (id) => {
+      if (id==="legacy_time") { setGMin("0"); }
+      if (id==="legacy_pages") { setGPg("0"); }
+      const updated = goalsList.filter(g=>g.id!==id);
+      setGoalsList(updated);
+      try { localStorage.setItem("bm_goals", JSON.stringify(updated)); } catch {}
+    };
 
     return (
       <div style={{ ...S.app, paddingBottom:90 }}>
-        <div style={S.hdr}>
+        <div style={{ padding:"22px 22px 10px" }}>
           <span style={{ ...S.logoText, fontSize:16 }}>GOALS & STATS</span>
-          <button onClick={handleSignOut} style={{ ...S.back, fontSize:12 }}>Sign out</button>
         </div>
+
         {/* Tabs */}
-        <div style={{ display:"flex", gap:0, margin:"0 22px 20px", background:"rgba(255,255,255,0.05)", borderRadius:12, padding:4 }}>
-          {[["goals","Goals"],["stats","Stats"]].map(([t,lbl]) => (
+        <div style={{ display:"flex", gap:0, margin:"0 22px 16px", background:"rgba(255,255,255,0.05)", borderRadius:12, padding:4 }}>
+          {[["stats","Stats"],["goals","Goals"]].map(([t,lbl]) => (
             <button key={t} onClick={() => setGoalsTab(t)}
               style={{ flex:1, padding:"10px 0", borderRadius:10, border:"none", cursor:"pointer", fontSize:13, fontFamily:"inherit", fontWeight:600,
                 background: goalsTab===t ? "linear-gradient(135deg,#fff,#aaa)" : "transparent",
@@ -848,63 +965,121 @@ function Bookmark() {
           ))}
         </div>
 
-        {goalsTab === "goals" && (
-          <div style={{ padding:"0 28px 20px" }}>
-            <div style={{ marginBottom:22 }}>
-              <label style={S.label}>DAILY TIME GOAL (MINUTES)</label>
-              <input style={S.inp} type="number" placeholder="e.g. 30" value={gMin} onChange={e => setGMin(e.target.value)}/>
-              <div style={{ fontSize:11, color:"rgba(255,255,255,0.2)", marginTop:6 }}>Set to 0 to disable.</div>
-            </div>
-            <div style={{ marginBottom:28 }}>
-              <label style={S.label}>DAILY PAGES GOAL</label>
-              <input style={S.inp} type="number" placeholder="e.g. 20" value={gPg} onChange={e => setGPg(e.target.value)}/>
-              <div style={{ fontSize:11, color:"rgba(255,255,255,0.2)", marginTop:6 }}>Set to 0 to disable.</div>
-            </div>
-            <div style={{ padding:"20px", background:"rgba(255,255,255,0.03)", borderRadius:14, border:"1px solid rgba(255,255,255,0.06)", marginBottom:28 }}>
-              <div style={{ fontSize:10, letterSpacing:3, color:"rgba(255,255,255,0.25)", marginBottom:10 }}>CURRENT STREAK</div>
-              <div style={{ fontSize:42, fontWeight:800, letterSpacing:-2, lineHeight:1 }}>{profile.streak}</div>
-              <div style={{ fontSize:12, color:"rgba(255,255,255,0.3)", marginTop:5 }}>consecutive day{profile.streak !== 1 ? "s" : ""} read</div>
-            </div>
-            <button style={{ ...S.pBtn, marginTop:0, opacity: goalsSaving ? 0.6 : 1 }} onClick={saveGoals} disabled={goalsSaving}>
-              {goalsSaving ? "Saving…" : "Save Goals"}
-            </button>
-          </div>
-        )}
-
         {goalsTab === "stats" && (
           <div style={{ padding:"0 22px 20px" }}>
             {/* Range picker */}
-            <div style={{ display:"flex", gap:6, marginBottom:20, background:"rgba(255,255,255,0.05)", borderRadius:12, padding:4 }}>
-              {[["daily","Today"],["monthly","This Month"],["yearly","This Year"]].map(([r,lbl]) => (
+            <div style={{ display:"flex", gap:3, marginBottom: statsRange==="custom" ? 12 : 18, background:"rgba(255,255,255,0.05)", borderRadius:12, padding:3 }}>
+              {[["28days","28 Days"],["monthly","Month"],["yearly","Year"],["custom","Custom"]].map(([r,lbl]) => (
                 <button key={r} onClick={() => setStatsRange(r)}
-                  style={{ flex:1, padding:"9px 0", borderRadius:10, border:"none", cursor:"pointer", fontSize:12, fontFamily:"inherit", fontWeight:600,
+                  style={{ flex:1, padding:"9px 0", borderRadius:10, border:"none", cursor:"pointer", fontSize:11, fontFamily:"inherit", fontWeight:600,
                     background: statsRange===r ? "linear-gradient(135deg,#fff,#aaa)" : "transparent",
                     color: statsRange===r ? "#000" : "rgba(255,255,255,0.4)" }}>
                   {lbl}
                 </button>
               ))}
             </div>
-            {/* Stat summary cards */}
-            <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8, marginBottom:22 }}>
-              {statCards.map(({label,value}) => (
-                <div key={label} style={{ padding:"16px", background:"rgba(255,255,255,0.04)", border:"1px solid rgba(255,255,255,0.07)", borderRadius:14 }}>
-                  <div style={{ fontSize:28, fontWeight:800, letterSpacing:-1, lineHeight:1 }}>{value}</div>
-                  <div style={{ fontSize:10, color:"rgba(255,255,255,0.35)", marginTop:5, letterSpacing:1 }}>{label.toUpperCase()}</div>
+            {statsRange === "custom" && (
+              <div style={{ display:"flex", gap:10, alignItems:"center", marginBottom:18 }}>
+                <div style={{ flex:1 }}>
+                  <div style={{ fontSize:9, letterSpacing:2, color:"rgba(255,255,255,0.3)", marginBottom:5 }}>FROM</div>
+                  <input type="date" value={customFrom} onChange={e => setCustomFrom(e.target.value)} style={{ ...S.inp, padding:"10px 12px", fontSize:14, colorScheme:"dark" }}/>
                 </div>
-              ))}
-            </div>
-            {/* Bar chart — minutes read */}
-            <div style={{ marginBottom:8 }}>
-              <div style={{ fontSize:10, letterSpacing:2, color:"rgba(255,255,255,0.25)", marginBottom:12 }}>MINUTES READ</div>
-              <div style={{ display:"flex", alignItems:"flex-end", gap:2, height:80 }}>
-                {chartData.map((d,i) => (
-                  <div key={i} style={{ flex:1, display:"flex", flexDirection:"column", alignItems:"center", gap:3 }}>
-                    <div style={{ width:"100%", background: d.value > 0 ? "#fff" : "rgba(255,255,255,0.08)", borderRadius:"2px 2px 0 0", height: Math.max(2, (d.value/maxVal)*72), transition:"height 0.4s" }}/>
-                    {d.label && <span style={{ fontSize:8, color:"rgba(255,255,255,0.25)" }}>{d.label}</span>}
-                  </div>
-                ))}
+                <div style={{ fontSize:16, color:"rgba(255,255,255,0.2)", paddingTop:20 }}>→</div>
+                <div style={{ flex:1 }}>
+                  <div style={{ fontSize:9, letterSpacing:2, color:"rgba(255,255,255,0.3)", marginBottom:5 }}>TO</div>
+                  <input type="date" value={customTo} onChange={e => setCustomTo(e.target.value)} style={{ ...S.inp, padding:"10px 12px", fontSize:14, colorScheme:"dark" }}/>
+                </div>
+              </div>
+            )}
+            {/* Streak callout */}
+            {profile.streak > 0 && (
+              <div style={{ display:"flex", alignItems:"center", gap:12, padding:"12px 16px", background:"rgba(255,255,255,0.04)", border:"1px solid rgba(255,255,255,0.07)", borderRadius:14, marginBottom:14 }}>
+                <div style={{ fontSize:36, fontWeight:800, letterSpacing:-2, lineHeight:1 }}>{profile.streak}</div>
+                <div>
+                  <div style={{ fontSize:13, fontWeight:600 }}>day streak</div>
+                  <div style={{ fontSize:11, color:"rgba(255,255,255,0.35)", marginTop:2 }}>{STREAK_MSGS[Math.min(profile.streak-1,STREAK_MSGS.length-1)](profile.streak)}</div>
+                </div>
+              </div>
+            )}
+            {/* Charts — Apple Health style */}
+            <MiniBarChart metric="minutes" label="Minutes Read" total={totalMins} unit="min"/>
+            <MiniBarChart metric="pages" label="Pages Read" total={totalPages} unit="pg"/>
+            <MiniBarChart metric="sessions" label="Reading Sessions" total={filtered.length}/>
+            <MiniBarChart metric="days" label="Days Read" total={uniqueDays}/>
+          </div>
+        )}
+
+        {goalsTab === "goals" && (
+          <div style={{ padding:"0 22px 20px" }}>
+            {/* Active goals list */}
+            {allGoals.length > 0 ? (
+              <div style={{ marginBottom:20 }}>
+                {allGoals.map(g => {
+                  const todayVal = g.type==="time" ? todayTotals.mins : g.type==="pages" ? todayTotals.pgs : 0;
+                  const pct = g.value > 0 ? Math.min(1, todayVal / g.value) : 0;
+                  return (
+                    <div key={g.id} style={{ background:"rgba(255,255,255,0.04)", border:"1px solid rgba(255,255,255,0.07)", borderRadius:18, padding:"20px", marginBottom:10 }}>
+                      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:12 }}>
+                        <div>
+                          <div style={{ fontSize:11, letterSpacing:2, color:"rgba(255,255,255,0.3)", marginBottom:4 }}>DAILY GOAL</div>
+                          <div style={{ fontSize:30, fontWeight:800, letterSpacing:-1.5, lineHeight:1 }}>{g.value} <span style={{ fontSize:14, fontWeight:400, color:"rgba(255,255,255,0.4)" }}>{g.type==="time"?"min":"pages"}</span></div>
+                        </div>
+                        <div style={{ textAlign:"right" }}>
+                          <div style={{ fontSize:11, color:"rgba(255,255,255,0.4)", marginBottom:2 }}>Today</div>
+                          <div style={{ fontSize:20, fontWeight:700, color: pct>=1 ? "#fff" : "rgba(255,255,255,0.6)" }}>{todayVal}{pct>=1 ? " ✓" : ""}</div>
+                        </div>
+                      </div>
+                      <div style={{ height:4, background:"rgba(255,255,255,0.08)", borderRadius:4, marginBottom:10 }}>
+                        <div style={{ height:"100%", width:(pct*100)+"%", background: pct>=1 ? "linear-gradient(90deg,#fff,#aaa)" : "#fff", borderRadius:4, transition:"width 0.6s" }}/>
+                      </div>
+                      <button onClick={() => removeGoal(g.id)} style={{ background:"none", border:"none", color:"rgba(255,255,255,0.2)", cursor:"pointer", fontSize:11, fontFamily:"inherit", padding:0 }}>Remove goal</button>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div style={{ textAlign:"center", padding:"32px 0 20px", color:"rgba(255,255,255,0.2)", fontSize:14, fontStyle:"italic", lineHeight:1.8 }}>
+                No goals set yet.<br/>Add one below to get started.
+              </div>
+            )}
+
+            {/* Streak */}
+            <div style={{ padding:"16px", background:"rgba(255,255,255,0.03)", borderRadius:14, border:"1px solid rgba(255,255,255,0.06)", marginBottom:20, display:"flex", alignItems:"center", gap:14 }}>
+              <div style={{ fontSize:36, fontWeight:800, letterSpacing:-2, lineHeight:1 }}>{profile.streak}</div>
+              <div>
+                <div style={{ fontSize:12, fontWeight:600 }}>day streak</div>
+                <div style={{ fontSize:11, color:"rgba(255,255,255,0.3)", marginTop:2 }}>consecutive day{profile.streak!==1?"s":""} read</div>
               </div>
             </div>
+
+            {/* Add goal */}
+            {!showAddGoal ? (
+              <button onClick={() => setShowAddGoal(true)} style={{ display:"flex", alignItems:"center", justifyContent:"center", gap:8, width:"100%", padding:"16px", borderRadius:14, border:"1px dashed rgba(255,255,255,0.2)", background:"rgba(255,255,255,0.03)", color:"rgba(255,255,255,0.6)", cursor:"pointer", fontSize:15, fontFamily:"inherit", fontWeight:600 }}>
+                <span style={{ fontSize:20, lineHeight:1 }}>+</span> New Goal
+              </button>
+            ) : (
+              <div style={{ background:"rgba(255,255,255,0.04)", border:"1px solid rgba(255,255,255,0.1)", borderRadius:18, padding:"20px" }}>
+                <div style={{ fontSize:10, letterSpacing:2, color:"rgba(255,255,255,0.3)", marginBottom:14 }}>NEW GOAL</div>
+                <div style={{ display:"flex", gap:8, marginBottom:16 }}>
+                  {[["time","Daily Time"],["pages","Daily Pages"]].map(([t,lbl]) => (
+                    <button key={t} onClick={() => setNewGoalType(t)}
+                      style={{ flex:1, padding:"10px 0", borderRadius:10, border:"none", cursor:"pointer", fontSize:13, fontFamily:"inherit", fontWeight:600,
+                        background: newGoalType===t ? "linear-gradient(135deg,#fff,#aaa)" : "rgba(255,255,255,0.06)",
+                        color: newGoalType===t ? "#000" : "rgba(255,255,255,0.6)" }}>
+                      {lbl}
+                    </button>
+                  ))}
+                </div>
+                <div style={{ marginBottom:16 }}>
+                  <label style={S.label}>{newGoalType==="time" ? "MINUTES PER DAY" : "PAGES PER DAY"}</label>
+                  <input style={S.inp} type="number" placeholder={newGoalType==="time" ? "e.g. 30" : "e.g. 20"} value={newGoalValue} onChange={e => setNewGoalValue(e.target.value)}/>
+                </div>
+                <div style={{ display:"flex", gap:8 }}>
+                  <button onClick={addGoal} style={{ ...S.pBtn, flex:1, marginTop:0 }}>Add Goal</button>
+                  <button onClick={() => { setShowAddGoal(false); setNewGoalValue(""); }} style={{ ...S.gBtn, flex:1, marginTop:0 }}>Cancel</button>
+                </div>
+              </div>
+            )}
           </div>
         )}
         <BottomNav screen={screen} setScreen={setScreen} onStartTimer={() => { setElapsed(0); setTimerRunning(false); setCountdownDone(false); setScreen(SCREENS.TIMER); }}/>
@@ -1275,6 +1450,61 @@ function Bookmark() {
               </div>
             </div>
           ))}
+        </div>
+        <BottomNav screen={screen} setScreen={setScreen} onStartTimer={() => { setElapsed(0); setTimerRunning(false); setCountdownDone(false); setScreen(SCREENS.TIMER); }}/>
+      </div>
+    );
+  }
+
+  // ── Account ──
+  if (screen === SCREENS.ACCOUNT) {
+    const firstName = user?.email?.split("@")[0]?.split(".")[0] || "";
+    const displayName = firstName.charAt(0).toUpperCase() + firstName.slice(1);
+    const Section = ({ title, items }) => (
+      <div style={{ marginBottom:24 }}>
+        <div style={{ fontSize:9, letterSpacing:3, color:"rgba(255,255,255,0.25)", marginBottom:8, paddingLeft:4 }}>{title}</div>
+        <div style={{ background:"rgba(255,255,255,0.04)", border:"1px solid rgba(255,255,255,0.07)", borderRadius:16, overflow:"hidden" }}>
+          {items.map(({ label, sub, icon, action, danger }, i) => (
+            <div key={label} onClick={action || undefined}
+              style={{ display:"flex", alignItems:"center", gap:14, padding:"16px 18px", borderBottom: i<items.length-1 ? "1px solid rgba(255,255,255,0.05)" : "none", cursor: action ? "pointer" : "default" }}>
+              <div style={{ width:36, height:36, borderRadius:10, background:"rgba(255,255,255,0.06)", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
+                {icon}
+              </div>
+              <div style={{ flex:1 }}>
+                <div style={{ fontSize:15, fontWeight:500, color: danger ? "#f87171" : "#fff" }}>{label}</div>
+                {sub && <div style={{ fontSize:11, color:"rgba(255,255,255,0.3)", marginTop:2 }}>{sub}</div>}
+              </div>
+              {action && !danger && <svg width={14} height={14} viewBox="0 0 24 24" fill="none"><path d="M9 18L15 12L9 6" stroke="rgba(255,255,255,0.25)" strokeWidth="2" strokeLinecap="round"/></svg>}
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+    return (
+      <div style={{ ...S.app, paddingBottom:90 }}>
+        <div style={{ padding:"28px 22px 20px" }}>
+          <div style={{ fontSize:10, letterSpacing:3, color:"rgba(255,255,255,0.25)", marginBottom:6 }}>ACCOUNT</div>
+          <div style={{ fontSize:24, fontWeight:700, letterSpacing:-0.5 }}>{displayName || "Reader"}</div>
+          <div style={{ fontSize:13, color:"rgba(255,255,255,0.3)", marginTop:3 }}>{user?.email}</div>
+        </div>
+        <div style={{ padding:"0 22px 20px" }}>
+          <Section title="READING" items={[
+            { label:"Notifications", sub:"Reading reminders and streak alerts", icon:<svg width={18} height={18} viewBox="0 0 24 24" fill="none"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 01-3.46 0" stroke="rgba(255,255,255,0.6)" strokeWidth="1.8" strokeLinecap="round"/></svg> },
+            { label:"Communication Preferences", sub:"Emails, tips, and weekly summaries", icon:<svg width={18} height={18} viewBox="0 0 24 24" fill="none"><rect x="2" y="4" width="20" height="16" rx="2" stroke="rgba(255,255,255,0.6)" strokeWidth="1.8"/><path d="M2 8l10 6 10-6" stroke="rgba(255,255,255,0.6)" strokeWidth="1.8" strokeLinecap="round"/></svg> },
+          ]}/>
+          <Section title="SUPPORT" items={[
+            { label:"Help & FAQ", sub:"How to use Bookmark", icon:<svg width={18} height={18} viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="rgba(255,255,255,0.6)" strokeWidth="1.8"/><path d="M9 9a3 3 0 015.83 1c0 2-3 3-3 3" stroke="rgba(255,255,255,0.6)" strokeWidth="1.8" strokeLinecap="round"/><circle cx="12" cy="17" r="1" fill="rgba(255,255,255,0.6)"/></svg> },
+            { label:"Send Feedback", sub:"Help us improve the app", icon:<svg width={18} height={18} viewBox="0 0 24 24" fill="none"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" stroke="rgba(255,255,255,0.6)" strokeWidth="1.8" strokeLinejoin="round"/></svg> },
+          ]}/>
+          <Section title="PRIVACY & LEGAL" items={[
+            { label:"Privacy & Data Sharing", sub:"How your reading data is used", icon:<svg width={18} height={18} viewBox="0 0 24 24" fill="none"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" stroke="rgba(255,255,255,0.6)" strokeWidth="1.8" strokeLinejoin="round"/></svg> },
+            { label:"Terms of Service", icon:<svg width={18} height={18} viewBox="0 0 24 24" fill="none"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" stroke="rgba(255,255,255,0.6)" strokeWidth="1.8" strokeLinejoin="round"/><polyline points="14 2 14 8 20 8" stroke="rgba(255,255,255,0.6)" strokeWidth="1.8" strokeLinejoin="round"/></svg> },
+            { label:"Licenses", icon:<svg width={18} height={18} viewBox="0 0 24 24" fill="none"><path d="M9 11l3 3L22 4" stroke="rgba(255,255,255,0.6)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11" stroke="rgba(255,255,255,0.6)" strokeWidth="1.8" strokeLinecap="round"/></svg> },
+          ]}/>
+          <Section title="" items={[
+            { label:"Sign Out", danger:true, action: handleSignOut, icon:<svg width={18} height={18} viewBox="0 0 24 24" fill="none"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4" stroke="#f87171" strokeWidth="1.8" strokeLinecap="round"/><polyline points="16 17 21 12 16 7" stroke="#f87171" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/><line x1="21" y1="12" x2="9" y2="12" stroke="#f87171" strokeWidth="1.8" strokeLinecap="round"/></svg> },
+          ]}/>
+          <div style={{ textAlign:"center", fontSize:10, color:"rgba(255,255,255,0.12)", marginTop:8 }}>Bookmark v1.0</div>
         </div>
         <BottomNav screen={screen} setScreen={setScreen} onStartTimer={() => { setElapsed(0); setTimerRunning(false); setCountdownDone(false); setScreen(SCREENS.TIMER); }}/>
       </div>
