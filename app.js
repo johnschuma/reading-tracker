@@ -9,7 +9,7 @@ const { useState, useEffect, useRef, useCallback } = React;
 const { createClient } = supabase;
 const sb = createClient(SUPABASE_URL, SUPABASE_ANON);
 
-const SCREENS = { AUTH:"auth", HOME:"home", TIMER:"timer", CAMERA:"camera", COMPOSE:"compose", GOALS:"goals" };
+const SCREENS = { AUTH:"auth", HOME:"home", TIMER:"timer", CAMERA:"camera", COMPOSE:"compose", GOALS:"goals", HISTORY:"history" };
 
 const QUOTES = [
   { text:"A reader lives a thousand lives before he dies. The man who never reads lives only one.", author:"George R.R. Martin" },
@@ -227,6 +227,59 @@ const TEMPLATES = [
   { id:"block",     label:"Block",     Component:CardBlock     },
 ];
 
+
+function BottomNav({ screen, setScreen, onStartTimer }) {
+  const active = s => s === screen ? "#fff" : "rgba(255,255,255,0.35)";
+  const activeLabel = s => ({ fontSize:9, letterSpacing:1, textTransform:"uppercase", color: s === screen ? "#fff" : "rgba(255,255,255,0.35)", marginTop:3 });
+  const navBtn = s => ({ background:"none", border:"none", cursor:"pointer", display:"flex", flexDirection:"column", alignItems:"center", padding:"4px 10px", fontFamily:"'Times New Roman',Times,serif" });
+  return (
+    <div style={{ position:"fixed", bottom:0, left:"50%", transform:"translateX(-50%)", width:"100%", maxWidth:430, background:"rgba(7,7,15,0.96)", borderTop:"1px solid rgba(255,255,255,0.07)", backdropFilter:"blur(16px)", display:"flex", alignItems:"center", justifyContent:"space-around", padding:"10px 0 22px", zIndex:200 }}>
+      {/* Home */}
+      <button style={navBtn(SCREENS.HOME)} onClick={() => setScreen(SCREENS.HOME)}>
+        <svg width={22} height={22} viewBox="0 0 24 24" fill="none">
+          <path d="M3 12L12 3L21 12V21H15V15H9V21H3V12Z" stroke={active(SCREENS.HOME)} strokeWidth="1.8" strokeLinejoin="round" fill={screen===SCREENS.HOME ? "rgba(255,255,255,0.12)" : "none"}/>
+        </svg>
+        <span style={activeLabel(SCREENS.HOME)}>Home</span>
+      </button>
+      {/* History */}
+      <button style={navBtn(SCREENS.HISTORY)} onClick={() => setScreen(SCREENS.HISTORY)}>
+        <svg width={22} height={22} viewBox="0 0 24 24" fill="none">
+          <rect x="3" y="3" width="7" height="7" rx="1" stroke={active(SCREENS.HISTORY)} strokeWidth="1.8" fill={screen===SCREENS.HISTORY ? "rgba(255,255,255,0.12)" : "none"}/>
+          <rect x="14" y="3" width="7" height="7" rx="1" stroke={active(SCREENS.HISTORY)} strokeWidth="1.8" fill={screen===SCREENS.HISTORY ? "rgba(255,255,255,0.12)" : "none"}/>
+          <rect x="3" y="14" width="7" height="7" rx="1" stroke={active(SCREENS.HISTORY)} strokeWidth="1.8" fill={screen===SCREENS.HISTORY ? "rgba(255,255,255,0.12)" : "none"}/>
+          <rect x="14" y="14" width="7" height="7" rx="1" stroke={active(SCREENS.HISTORY)} strokeWidth="1.8" fill={screen===SCREENS.HISTORY ? "rgba(255,255,255,0.12)" : "none"}/>
+        </svg>
+        <span style={activeLabel(SCREENS.HISTORY)}>History</span>
+      </button>
+      {/* Record (center) */}
+      <button onClick={onStartTimer}
+        style={{ background:"linear-gradient(135deg,#fff,#888)", border:"none", cursor:"pointer", borderRadius:"50%", width:52, height:52, display:"flex", alignItems:"center", justifyContent:"center", marginBottom:8, boxShadow:"0 4px 24px rgba(255,255,255,0.18)", flexShrink:0 }}>
+        <svg width={18} height={18} viewBox="0 0 18 18" fill="none">
+          <path d="M5 3.5L14.5 9L5 14.5V3.5Z" fill="#000"/>
+        </svg>
+      </button>
+      {/* Goals */}
+      <button style={navBtn(SCREENS.GOALS)} onClick={() => setScreen(SCREENS.GOALS)}>
+        <svg width={22} height={22} viewBox="0 0 24 24" fill="none">
+          <circle cx="12" cy="12" r="9" stroke={active(SCREENS.GOALS)} strokeWidth="1.8"/>
+          <circle cx="12" cy="12" r="5" stroke={active(SCREENS.GOALS)} strokeWidth="1.8"/>
+          <circle cx="12" cy="12" r="1.5" fill={active(SCREENS.GOALS)}/>
+        </svg>
+        <span style={activeLabel(SCREENS.GOALS)}>Goals</span>
+      </button>
+      {/* Timer (settings) */}
+      <button style={navBtn(SCREENS.TIMER)} onClick={() => setScreen(SCREENS.TIMER)}>
+        <svg width={22} height={22} viewBox="0 0 24 24" fill="none">
+          <circle cx="12" cy="13" r="8" stroke={active(SCREENS.TIMER)} strokeWidth="1.8"/>
+          <path d="M12 9V13L15 15" stroke={active(SCREENS.TIMER)} strokeWidth="1.8" strokeLinecap="round"/>
+          <path d="M9 2H15" stroke={active(SCREENS.TIMER)} strokeWidth="1.8" strokeLinecap="round"/>
+        </svg>
+        <span style={activeLabel(SCREENS.TIMER)}>Timer</span>
+      </button>
+    </div>
+  );
+}
+
 function Bookmark() {
 
   const [user, setUser]               = useState(null);
@@ -243,6 +296,8 @@ function Bookmark() {
   const [gMin, setGMin]                         = useState("");
   const [gPg, setGPg]                           = useState("");
   const [goalsSaving, setGoalsSaving]           = useState(false);
+  const [goalsTab, setGoalsTab]                 = useState("goals");
+  const [statsRange, setStatsRange]             = useState("monthly");
 
   const [sessions, setSessions]                 = useState([]);
   const [sessionsLoading, setSessionsLoading]   = useState(false);
@@ -264,6 +319,7 @@ function Bookmark() {
   const [searchLoading, setSearchLoading]   = useState(false);
   const [searchError, setSearchError]       = useState(null);
   const [selectedBook, setSelectedBook]     = useState(null);
+  const [recentBooks, setRecentBooks]       = useState(() => { try { return JSON.parse(localStorage.getItem("bm_recent") || "[]"); } catch { return []; } });
   const [startingPage, setStartingPage]     = useState("");
   const [currentPage, setCurrentPage]       = useState("");
   const [bookFinished, setBookFinished]     = useState(false);
@@ -684,120 +740,177 @@ function Bookmark() {
             </div>
           )}
 
-          {/* ── Timer hero ── */}
-          <div
-            onClick={() => { setElapsed(0); setTimerRunning(false); setCountdownDone(false); setScreen(SCREENS.TIMER); }}
-            style={{ ...S.card, textAlign:"center", padding:"32px 22px", marginBottom:18, cursor:"pointer", borderColor:"rgba(255,255,255,0.1)" }}>
-            <div style={{ fontSize:56, fontWeight:700, letterSpacing:-3, lineHeight:1, fontFamily:"'Times New Roman',Times,serif", color:"#fff", marginBottom:8 }}>
-              {fmt(elapsed > 0 ? elapsed : 0)}
-            </div>
-            <div style={{ fontSize:9, letterSpacing:4, color:"rgba(255,255,255,0.25)", textTransform:"uppercase", marginBottom:20 }}>
-              {elapsed > 0 ? "paused — tap to resume" : "tap to begin reading"}
-            </div>
-            <div style={{ display:"inline-flex", alignItems:"center", justifyContent:"center", width:56, height:56, borderRadius:"50%", background:"linear-gradient(135deg,#fff,#888)" }}>
-              <svg width={18} height={18} viewBox="0 0 18 18" fill="none">
-                <path d="M5 3.5L14.5 9L5 14.5V3.5Z" fill="#000"/>
+          {/* ── Big circle timer focal point ── */}
+          <div style={{ display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", paddingTop:10, paddingBottom:16 }}>
+            <div
+              onClick={() => { setElapsed(0); setTimerRunning(false); setCountdownDone(false); setScreen(SCREENS.TIMER); }}
+              style={{ position:"relative", cursor:"pointer", userSelect:"none" }}>
+              {/* outer glow ring */}
+              <svg width={280} height={280} style={{ transform:"rotate(-90deg)", display:"block" }}>
+                <circle cx={140} cy={140} r={126} fill="none" stroke="rgba(255,255,255,0.04)" strokeWidth={2}/>
+                <circle cx={140} cy={140} r={118} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth={1}/>
               </svg>
+              {/* inner content */}
+              <div style={{ position:"absolute", inset:0, display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center" }}>
+                <div style={{ fontSize:11, letterSpacing:4, color:"rgba(255,255,255,0.2)", textTransform:"uppercase", marginBottom:12 }}>
+                  {elapsed > 0 ? "paused" : "reading"}
+                </div>
+                <div style={{ fontSize:52, fontWeight:300, letterSpacing:-2, lineHeight:1, fontFamily:"'Times New Roman',Times,serif", color:"#fff" }}>
+                  {fmt(elapsed > 0 ? elapsed : 0)}
+                </div>
+                <div style={{ marginTop:24, width:52, height:52, borderRadius:"50%", background: elapsed > 0 ? "rgba(255,255,255,0.1)" : "linear-gradient(135deg,#fff,#aaa)", display:"flex", alignItems:"center", justifyContent:"center", border: elapsed > 0 ? "1px solid rgba(255,255,255,0.2)" : "none" }}>
+                  <svg width={16} height={16} viewBox="0 0 18 18" fill="none">
+                    <path d="M5 3.5L14.5 9L5 14.5V3.5Z" fill={elapsed > 0 ? "#fff" : "#000"}/>
+                  </svg>
+                </div>
+              </div>
+            </div>
+            <div style={{ fontSize:10, letterSpacing:2, color:"rgba(255,255,255,0.15)", marginTop:4, textTransform:"uppercase" }}>
+              tap to {elapsed > 0 ? "resume" : "begin"}
             </div>
           </div>
-
-          {/* ── Instagram-style grid ── */}
-          {sessionsLoading ? (
-            <div style={{ textAlign:"center", color:"rgba(255,255,255,0.2)", fontSize:13, padding:"40px 0" }}>Loading…</div>
-          ) : sessions.length > 0 ? (
-            <>
-              <div style={{ fontSize:10, letterSpacing:3, color:"rgba(255,255,255,0.2)", marginBottom:10 }}>READING HISTORY</div>
-              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:2, margin:"0 -22px" }}>
-                {sessions.map((s, i) => (
-                  <div key={s.id || i} style={{ position:"relative", aspectRatio:"1/1", background:"#111", overflow:"hidden" }}>
-                    {s.photo_url
-                      ? <img src={s.photo_url} style={{ position:"absolute", inset:0, width:"100%", height:"100%", objectFit:"cover" }}/>
-                      : s.book?.open_library_cover_id
-                        ? <img src={"https://covers.openlibrary.org/b/id/" + s.book.open_library_cover_id + "-M.jpg"} crossOrigin="anonymous" style={{ position:"absolute", inset:0, width:"100%", height:"100%", objectFit:"cover", opacity:0.5 }}/>
-                        : <div style={{ position:"absolute", inset:0, background:"#111", display:"flex", alignItems:"center", justifyContent:"center" }}><LogoMark size={20} color="rgba(255,255,255,0.08)"/></div>
-                    }
-                    <div style={{ position:"absolute", inset:0, background:"linear-gradient(to top,rgba(0,0,0,0.75) 0%,transparent 50%)" }}/>
-                    <div style={{ position:"absolute", bottom:6, left:6, right:6 }}>
-                      {s.book?.title && <div style={{ fontSize:9, fontWeight:700, color:"#fff", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{s.book.title}</div>}
-                      <div style={{ fontSize:8, color:"rgba(255,255,255,0.5)", marginTop:1 }}>{fmtLabel(s.time_secs || 0)}{s.pages_read ? ` · ${s.pages_read}pg` : ""}</div>
-                    </div>
-                    {s.finished && (
-                      <div style={{ position:"absolute", top:5, right:5, background:"rgba(0,0,0,0.6)", borderRadius:4, padding:"2px 5px", fontSize:8, color:"rgba(255,255,255,0.7)", backdropFilter:"blur(6px)" }}>Finished</div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </>
-          ) : (
-            <div style={{ textAlign:"center", padding:"40px 0", color:"rgba(255,255,255,0.15)", fontSize:14, fontStyle:"italic", lineHeight:1.7 }}>
-              Your reading history<br/>will appear here.
-            </div>
-          )}
         </div>
 
-        {/* ── Bottom nav ── */}
-        <div style={{ position:"fixed", bottom:0, left:"50%", transform:"translateX(-50%)", width:"100%", maxWidth:430, background:"rgba(7,7,15,0.95)", borderTop:"1px solid rgba(255,255,255,0.07)", backdropFilter:"blur(12px)", display:"flex", alignItems:"center", justifyContent:"space-around", padding:"10px 0 20px", zIndex:100 }}>
-          {/* Home */}
-          <button onClick={() => setScreen(SCREENS.HOME)} style={{ background:"none", border:"none", cursor:"pointer", display:"flex", flexDirection:"column", alignItems:"center", gap:4, padding:"4px 16px" }}>
-            <svg width={22} height={22} viewBox="0 0 24 24" fill="none">
-              <path d="M3 12L12 3L21 12V21H15V15H9V21H3V12Z" stroke="#fff" strokeWidth="1.8" strokeLinejoin="round" fill="rgba(255,255,255,0.15)"/>
-            </svg>
-            <span style={{ fontSize:9, color:"#fff", letterSpacing:1, textTransform:"uppercase" }}>Home</span>
-          </button>
-          {/* Timer / Record */}
-          <button onClick={() => { setElapsed(0); setTimerRunning(false); setCountdownDone(false); setScreen(SCREENS.TIMER); }}
-            style={{ background:"linear-gradient(135deg,#fff,#888)", border:"none", cursor:"pointer", borderRadius:"50%", width:52, height:52, display:"flex", alignItems:"center", justifyContent:"center", marginBottom:8, boxShadow:"0 4px 20px rgba(255,255,255,0.2)" }}>
-            <svg width={18} height={18} viewBox="0 0 18 18" fill="none">
-              <path d="M5 3.5L14.5 9L5 14.5V3.5Z" fill="#000"/>
-            </svg>
-          </button>
-          {/* Goals */}
-          <button onClick={() => setScreen(SCREENS.GOALS)} style={{ background:"none", border:"none", cursor:"pointer", display:"flex", flexDirection:"column", alignItems:"center", gap:4, padding:"4px 16px" }}>
-            <svg width={22} height={22} viewBox="0 0 24 24" fill="none">
-              <circle cx="12" cy="12" r="9" stroke="rgba(255,255,255,0.5)" strokeWidth="1.8"/>
-              <circle cx="12" cy="12" r="5" stroke="rgba(255,255,255,0.5)" strokeWidth="1.8"/>
-              <circle cx="12" cy="12" r="1.5" fill="rgba(255,255,255,0.5)"/>
-            </svg>
-            <span style={{ fontSize:9, color:"rgba(255,255,255,0.5)", letterSpacing:1, textTransform:"uppercase" }}>Goals</span>
-          </button>
-        </div>
+        <BottomNav screen={screen} setScreen={setScreen} onStartTimer={() => { setElapsed(0); setTimerRunning(false); setCountdownDone(false); setScreen(SCREENS.TIMER); }}/>
       </div>
     );
   }
 
   // ── Goals ──
-  if (screen === SCREENS.GOALS) return (
-    <div style={S.app}>
-      <div style={S.hdr}>
-        <button style={S.back} onClick={() => setScreen(SCREENS.HOME)}>← Back</button>
-        <span style={S.sub}>Daily Goals</span>
-        <div style={{ width:56 }}/>
+  if (screen === SCREENS.GOALS) {
+    // compute stats from sessions
+    const now = new Date();
+    const rangeFilter = s => {
+      const d = new Date(s.created_at);
+      if (statsRange === "daily") return d.toISOString().slice(0,10) === todayStr();
+      if (statsRange === "monthly") { return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth(); }
+      return d.getFullYear() === now.getFullYear();
+    };
+    const filtered = sessions.filter(rangeFilter);
+    const totalMins = Math.round(filtered.reduce((a,s) => a + (s.time_secs||0), 0) / 60);
+    const totalPages = filtered.reduce((a,s) => a + (s.pages_read||0), 0);
+    const totalBooks = new Set(filtered.filter(s=>s.book?.title).map(s=>s.book.title+(s.finished?"_done":""))).size;
+    const totalFinished = filtered.filter(s=>s.finished).length;
+    const uniqueDays = new Set(filtered.map(s=>s.created_at?.slice(0,10))).size;
+
+    // chart data: last N periods
+    const chartData = (() => {
+      if (statsRange === "daily") {
+        // last 7 days hour-by-hour summary → just show per-hour sessions today
+        const hours = Array.from({length:24}, (_,i) => ({ label: i%6===0 ? i+"h" : "", value:0 }));
+        sessions.filter(s=>s.created_at?.slice(0,10)===todayStr()).forEach(s => {
+          const h = new Date(s.created_at).getHours();
+          hours[h].value += Math.round((s.time_secs||0)/60);
+        });
+        return hours;
+      } else if (statsRange === "monthly") {
+        const days = new Date(now.getFullYear(), now.getMonth()+1, 0).getDate();
+        const arr = Array.from({length:days}, (_,i) => ({ label: (i+1)%7===1 ? String(i+1) : "", value:0 }));
+        sessions.filter(s=>{ const d=new Date(s.created_at); return d.getFullYear()===now.getFullYear()&&d.getMonth()===now.getMonth(); }).forEach(s => {
+          const day = new Date(s.created_at).getDate()-1;
+          arr[day].value += Math.round((s.time_secs||0)/60);
+        });
+        return arr;
+      } else {
+        const arr = Array.from({length:12}, (_,i) => ({ label:["J","F","M","A","M","J","J","A","S","O","N","D"][i], value:0 }));
+        sessions.filter(s=>new Date(s.created_at).getFullYear()===now.getFullYear()).forEach(s => {
+          const m = new Date(s.created_at).getMonth();
+          arr[m].value += Math.round((s.time_secs||0)/60);
+        });
+        return arr;
+      }
+    })();
+    const maxVal = Math.max(...chartData.map(d=>d.value), 1);
+
+    const statCards = [
+      { label:"Minutes", value: totalMins },
+      { label:"Pages", value: totalPages },
+      { label:"Sessions", value: filtered.length },
+      { label:"Books finished", value: totalFinished },
+      { label:"Days read", value: uniqueDays },
+    ];
+
+    return (
+      <div style={{ ...S.app, paddingBottom:90 }}>
+        <div style={S.hdr}>
+          <span style={{ ...S.logoText, fontSize:16 }}>GOALS & STATS</span>
+          <button onClick={handleSignOut} style={{ ...S.back, fontSize:12 }}>Sign out</button>
+        </div>
+        {/* Tabs */}
+        <div style={{ display:"flex", gap:0, margin:"0 22px 20px", background:"rgba(255,255,255,0.05)", borderRadius:12, padding:4 }}>
+          {[["goals","Goals"],["stats","Stats"]].map(([t,lbl]) => (
+            <button key={t} onClick={() => setGoalsTab(t)}
+              style={{ flex:1, padding:"10px 0", borderRadius:10, border:"none", cursor:"pointer", fontSize:13, fontFamily:"inherit", fontWeight:600,
+                background: goalsTab===t ? "linear-gradient(135deg,#fff,#aaa)" : "transparent",
+                color: goalsTab===t ? "#000" : "rgba(255,255,255,0.4)" }}>
+              {lbl}
+            </button>
+          ))}
+        </div>
+
+        {goalsTab === "goals" && (
+          <div style={{ padding:"0 28px 20px" }}>
+            <div style={{ marginBottom:22 }}>
+              <label style={S.label}>DAILY TIME GOAL (MINUTES)</label>
+              <input style={S.inp} type="number" placeholder="e.g. 30" value={gMin} onChange={e => setGMin(e.target.value)}/>
+              <div style={{ fontSize:11, color:"rgba(255,255,255,0.2)", marginTop:6 }}>Set to 0 to disable.</div>
+            </div>
+            <div style={{ marginBottom:28 }}>
+              <label style={S.label}>DAILY PAGES GOAL</label>
+              <input style={S.inp} type="number" placeholder="e.g. 20" value={gPg} onChange={e => setGPg(e.target.value)}/>
+              <div style={{ fontSize:11, color:"rgba(255,255,255,0.2)", marginTop:6 }}>Set to 0 to disable.</div>
+            </div>
+            <div style={{ padding:"20px", background:"rgba(255,255,255,0.03)", borderRadius:14, border:"1px solid rgba(255,255,255,0.06)", marginBottom:28 }}>
+              <div style={{ fontSize:10, letterSpacing:3, color:"rgba(255,255,255,0.25)", marginBottom:10 }}>CURRENT STREAK</div>
+              <div style={{ fontSize:42, fontWeight:800, letterSpacing:-2, lineHeight:1 }}>{profile.streak}</div>
+              <div style={{ fontSize:12, color:"rgba(255,255,255,0.3)", marginTop:5 }}>consecutive day{profile.streak !== 1 ? "s" : ""} read</div>
+            </div>
+            <button style={{ ...S.pBtn, marginTop:0, opacity: goalsSaving ? 0.6 : 1 }} onClick={saveGoals} disabled={goalsSaving}>
+              {goalsSaving ? "Saving…" : "Save Goals"}
+            </button>
+          </div>
+        )}
+
+        {goalsTab === "stats" && (
+          <div style={{ padding:"0 22px 20px" }}>
+            {/* Range picker */}
+            <div style={{ display:"flex", gap:6, marginBottom:20, background:"rgba(255,255,255,0.05)", borderRadius:12, padding:4 }}>
+              {[["daily","Today"],["monthly","This Month"],["yearly","This Year"]].map(([r,lbl]) => (
+                <button key={r} onClick={() => setStatsRange(r)}
+                  style={{ flex:1, padding:"9px 0", borderRadius:10, border:"none", cursor:"pointer", fontSize:12, fontFamily:"inherit", fontWeight:600,
+                    background: statsRange===r ? "linear-gradient(135deg,#fff,#aaa)" : "transparent",
+                    color: statsRange===r ? "#000" : "rgba(255,255,255,0.4)" }}>
+                  {lbl}
+                </button>
+              ))}
+            </div>
+            {/* Stat summary cards */}
+            <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8, marginBottom:22 }}>
+              {statCards.map(({label,value}) => (
+                <div key={label} style={{ padding:"16px", background:"rgba(255,255,255,0.04)", border:"1px solid rgba(255,255,255,0.07)", borderRadius:14 }}>
+                  <div style={{ fontSize:28, fontWeight:800, letterSpacing:-1, lineHeight:1 }}>{value}</div>
+                  <div style={{ fontSize:10, color:"rgba(255,255,255,0.35)", marginTop:5, letterSpacing:1 }}>{label.toUpperCase()}</div>
+                </div>
+              ))}
+            </div>
+            {/* Bar chart — minutes read */}
+            <div style={{ marginBottom:8 }}>
+              <div style={{ fontSize:10, letterSpacing:2, color:"rgba(255,255,255,0.25)", marginBottom:12 }}>MINUTES READ</div>
+              <div style={{ display:"flex", alignItems:"flex-end", gap:2, height:80 }}>
+                {chartData.map((d,i) => (
+                  <div key={i} style={{ flex:1, display:"flex", flexDirection:"column", alignItems:"center", gap:3 }}>
+                    <div style={{ width:"100%", background: d.value > 0 ? "#fff" : "rgba(255,255,255,0.08)", borderRadius:"2px 2px 0 0", height: Math.max(2, (d.value/maxVal)*72), transition:"height 0.4s" }}/>
+                    {d.label && <span style={{ fontSize:8, color:"rgba(255,255,255,0.25)" }}>{d.label}</span>}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+        <BottomNav screen={screen} setScreen={setScreen} onStartTimer={() => { setElapsed(0); setTimerRunning(false); setCountdownDone(false); setScreen(SCREENS.TIMER); }}/>
       </div>
-      <div style={{ padding:"20px 28px 40px" }}>
-        <div style={{ fontSize:14, color:"rgba(255,255,255,0.35)", marginBottom:32, lineHeight:1.8 }}>
-          Set a daily reading goal. The rings on your home screen update as you read each day.
-        </div>
-        <div style={{ marginBottom:22 }}>
-          <label style={S.label}>DAILY TIME GOAL (MINUTES)</label>
-          <input style={S.inp} type="number" placeholder="e.g. 30" value={gMin} onChange={e => setGMin(e.target.value)}/>
-          <div style={{ fontSize:11, color:"rgba(255,255,255,0.2)", marginTop:6 }}>Set to 0 to disable.</div>
-        </div>
-        <div style={{ marginBottom:32 }}>
-          <label style={S.label}>DAILY PAGES GOAL</label>
-          <input style={S.inp} type="number" placeholder="e.g. 20" value={gPg} onChange={e => setGPg(e.target.value)}/>
-          <div style={{ fontSize:11, color:"rgba(255,255,255,0.2)", marginTop:6 }}>Set to 0 to disable.</div>
-        </div>
-        <div style={{ padding:"20px", background:"rgba(255,255,255,0.03)", borderRadius:14, border:"1px solid rgba(255,255,255,0.06)", marginBottom:28 }}>
-          <div style={{ fontSize:10, letterSpacing:3, color:"rgba(255,255,255,0.25)", marginBottom:10 }}>CURRENT STREAK</div>
-          <div style={{ fontSize:42, fontWeight:800, letterSpacing:-2, lineHeight:1 }}>{profile.streak}</div>
-          <div style={{ fontSize:12, color:"rgba(255,255,255,0.3)", marginTop:5 }}>consecutive day{profile.streak !== 1 ? "s" : ""} read</div>
-        </div>
-        <button style={{ ...S.pBtn, marginTop:0, opacity: goalsSaving ? 0.6 : 1 }} onClick={saveGoals} disabled={goalsSaving}>
-          {goalsSaving ? "Saving…" : "Save Goals"}
-        </button>
-      </div>
-    </div>
-  );
+    );
+  }
 
   // ── Timer ──
   if (screen === SCREENS.TIMER) {
@@ -828,24 +941,20 @@ function Bookmark() {
           )}
           {isCD && !sessionActive && !countdownDone && (
             <div style={{ marginBottom:20 }}>
-              <div style={{ ...S.label, textAlign:"center" }}>SET DURATION (MINUTES)</div>
-              <div style={{ display:"flex", flexWrap:"wrap", gap:8, justifyContent:"center", marginBottom:14 }}>
-                {PRESET_MINUTES.map(m => (
-                  <button key={m} onClick={() => { setCountdownInput(String(m)); const s = m * 60; setCountdownSet(s); setCountdownLeft(s); }}
-                    style={{ padding:"8px 16px", borderRadius:20,
-                      border: "1px solid " + (parseInt(countdownInput) === m ? "rgba(255,255,255,0.6)" : "rgba(255,255,255,0.1)"),
-                      background: parseInt(countdownInput) === m ? "rgba(255,255,255,0.15)" : "rgba(255,255,255,0.04)",
-                      color: parseInt(countdownInput) === m ? "#fff" : "rgba(255,255,255,0.6)",
-                      cursor:"pointer", fontSize:14, fontFamily:"inherit", fontWeight:600 }}>
-                    {m}m
-                  </button>
-                ))}
+              <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:14 }}>
+                <span style={{ ...S.label, marginBottom:0 }}>DURATION</span>
+                <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+                  <input type="number" value={countdownInput} min="1" max="240"
+                    onChange={e => { setCountdownInput(e.target.value); const m = Math.max(1, parseInt(e.target.value) || 20); const s = m * 60; setCountdownSet(s); setCountdownLeft(s); setElapsed(0); setCountdownDone(false); }}
+                    style={{ ...S.inp, width:64, textAlign:"center", padding:"8px 6px", fontSize:18, fontWeight:700 }}/>
+                  <span style={{ color:"rgba(255,255,255,0.35)", fontSize:13 }}>min</span>
+                </div>
               </div>
-              <div style={{ display:"flex", gap:8, alignItems:"center", justifyContent:"center" }}>
-                <input type="number" value={countdownInput} min="1" max="240"
-                  onChange={e => setCountdownInput(e.target.value)} onBlur={applyCountdown}
-                  style={{ ...S.inp, width:90, textAlign:"center", padding:"12px 8px", fontSize:20, fontWeight:700 }}/>
-                <span style={{ color:"rgba(255,255,255,0.4)", fontSize:15 }}>minutes</span>
+              <input type="range" min="1" max="120" step="1" value={countdownInput}
+                onChange={e => { setCountdownInput(e.target.value); const s = parseInt(e.target.value) * 60; setCountdownSet(s); setCountdownLeft(s); setElapsed(0); setCountdownDone(false); }}
+                style={{ width:"100%", accentColor:"#fff", marginBottom:6 }}/>
+              <div style={{ display:"flex", justifyContent:"space-between", fontSize:10, color:"rgba(255,255,255,0.2)" }}>
+                <span>1m</span><span>30m</span><span>60m</span><span>90m</span><span>120m</span>
               </div>
             </div>
           )}
@@ -867,6 +976,23 @@ function Bookmark() {
                 </button>
                 {bookExpanded && (
                   <div style={{ padding:"14px 16px", background:"rgba(0,0,0,0.2)" }}>
+                    {recentBooks.length > 0 && (
+                      <div style={{ marginBottom:14 }}>
+                        <div style={{ fontSize:9, letterSpacing:2, color:"rgba(255,255,255,0.25)", marginBottom:8 }}>RECENT</div>
+                        <div style={{ display:"flex", gap:8, flexWrap:"wrap" }}>
+                          {recentBooks.map((book, i) => (
+                            <div key={i} onClick={() => { setSelectedBook(book); setBookExpanded(false); }}
+                              style={{ display:"flex", alignItems:"center", gap:6, padding:"6px 10px", borderRadius:10, background:"rgba(255,255,255,0.07)", border:"1px solid rgba(255,255,255,0.08)", cursor:"pointer", maxWidth:160 }}>
+                              {book.open_library_cover_id
+                                ? <img src={"https://covers.openlibrary.org/b/id/" + book.open_library_cover_id + "-S.jpg"} crossOrigin="anonymous" style={{ width:18, height:24, borderRadius:2, objectFit:"cover", flexShrink:0 }}/>
+                                : <LogoMark size={12} color="rgba(255,255,255,0.4)"/>}
+                              <span style={{ fontSize:11, color:"rgba(255,255,255,0.75)", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{book.title}</span>
+                            </div>
+                          ))}
+                        </div>
+                        <div style={{ height:1, background:"rgba(255,255,255,0.06)", margin:"12px 0 0" }}/>
+                      </div>
+                    )}
                     <div style={{ display:"flex", gap:8, marginBottom:14 }}>
                       <input style={{ ...S.inp, flex:1, padding:"12px 14px" }} placeholder="Search by title or author…"
                         value={searchQuery} onChange={e => setSearchQuery(e.target.value)} onKeyDown={e => e.key === "Enter" && searchBooks()}/>
@@ -880,7 +1006,7 @@ function Bookmark() {
                     {searchLoading && <div style={{ textAlign:"center", color:"rgba(255,255,255,0.4)", fontSize:13, padding:"12px 0" }}>Searching…</div>}
                     {searchError && <div style={{ color:"#f87171", fontSize:13, padding:"8px 0" }}>{searchError}</div>}
                     {searchResults.map((book, i) => (
-                      <div key={i} onClick={() => { setSelectedBook(book); setBookExpanded(false); }}
+                      <div key={i} onClick={() => { setSelectedBook(book); setBookExpanded(false); const updated = [book, ...recentBooks.filter(b => b.title !== book.title)].slice(0, 5); setRecentBooks(updated); try { localStorage.setItem("bm_recent", JSON.stringify(updated)); } catch {} }}
                         style={{ display:"flex", gap:12, alignItems:"center", padding:"10px 0", borderBottom:"1px solid rgba(255,255,255,0.05)", cursor:"pointer" }}>
                         {book.open_library_cover_id
                           ? <img src={"https://covers.openlibrary.org/b/id/" + book.open_library_cover_id + "-S.jpg"} crossOrigin="anonymous" style={{ width:32, height:42, borderRadius:4, objectFit:"cover", flexShrink:0 }}/>
@@ -960,6 +1086,7 @@ function Bookmark() {
             </div>
           )}
         </div>
+        <BottomNav screen={screen} setScreen={setScreen} onStartTimer={() => { setElapsed(0); setTimerRunning(false); setCountdownDone(false); setScreen(SCREENS.TIMER); }}/>
       </div>
     );
   }
@@ -1013,6 +1140,7 @@ function Bookmark() {
           Skip — use gradient background
         </button>
       </div>
+      <BottomNav screen={screen} setScreen={setScreen} onStartTimer={() => { setElapsed(0); setTimerRunning(false); setCountdownDone(false); setScreen(SCREENS.TIMER); }}/>
     </div>
   );
 
@@ -1079,10 +1207,76 @@ function Bookmark() {
           <p style={{ textAlign:"center", marginTop:16, fontSize:12, color:"rgba(255,255,255,0.2)" }}>Export and share on Instagram, Twitter, or anywhere</p>
         </div>
         {showSwipeTip && (
-          <div style={{ position:"fixed", bottom:32, left:"50%", transform:"translateX(-50%)", background:"rgba(255,255,255,0.12)", backdropFilter:"blur(12px)", WebkitBackdropFilter:"blur(12px)", borderRadius:24, padding:"10px 20px", fontSize:13, color:"#fff", whiteSpace:"nowrap", pointerEvents:"none", letterSpacing:0.3 }}>
+          <div style={{ position:"fixed", bottom:90, left:"50%", transform:"translateX(-50%)", background:"rgba(255,255,255,0.12)", backdropFilter:"blur(12px)", WebkitBackdropFilter:"blur(12px)", borderRadius:24, padding:"10px 20px", fontSize:13, color:"#fff", whiteSpace:"nowrap", pointerEvents:"none", letterSpacing:0.3 }}>
             Swipe the preview to change templates
           </div>
         )}
+        <BottomNav screen={screen} setScreen={setScreen} onStartTimer={() => { setElapsed(0); setTimerRunning(false); setCountdownDone(false); setScreen(SCREENS.TIMER); }}/>
+      </div>
+    );
+  }
+
+  // ── History ──
+  if (screen === SCREENS.HISTORY) {
+    return (
+      <div style={{ ...S.app, paddingBottom:90 }}>
+        <div style={S.hdr}>
+          <span style={{ ...S.logoText, fontSize:16 }}>HISTORY</span>
+          <div style={{ fontSize:12, color:"rgba(255,255,255,0.3)" }}>{sessions.length} session{sessions.length!==1?"s":""}</div>
+        </div>
+        <div style={{ padding:"0 0 10px" }}>
+          {sessionsLoading ? (
+            <div style={{ textAlign:"center", color:"rgba(255,255,255,0.2)", fontSize:13, padding:"60px 0" }}>Loading…</div>
+          ) : sessions.length === 0 ? (
+            <div style={{ textAlign:"center", padding:"60px 22px", color:"rgba(255,255,255,0.15)", fontSize:14, fontStyle:"italic", lineHeight:1.8 }}>
+              No sessions yet.<br/>Start reading to build your history.
+            </div>
+          ) : sessions.map((s, i) => (
+            <div key={s.id || i} style={{ position:"relative", minHeight:200, overflow:"hidden", marginBottom:3, cursor:"pointer" }}>
+              {/* Background */}
+              {s.photo_url
+                ? <img src={s.photo_url} style={{ position:"absolute", inset:0, width:"100%", height:"100%", objectFit:"cover" }}/>
+                : s.book?.open_library_cover_id
+                  ? <img src={"https://covers.openlibrary.org/b/id/" + s.book.open_library_cover_id + "-L.jpg"} crossOrigin="anonymous" style={{ position:"absolute", inset:0, width:"100%", height:"100%", objectFit:"cover", opacity:0.4 }}/>
+                  : <div style={{ position:"absolute", inset:0, background:"linear-gradient(135deg,#0f0c29,#1a1535)" }}/>
+              }
+              {/* Dark overlay */}
+              <div style={{ position:"absolute", inset:0, background:"linear-gradient(to top, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0.55) 50%, rgba(0,0,0,0.2) 100%)" }}/>
+              {/* Content */}
+              <div style={{ position:"relative", padding:"28px 22px 24px", display:"flex", flexDirection:"column", justifyContent:"flex-end", minHeight:200 }}>
+                {s.finished && (
+                  <div style={{ fontSize:9, fontWeight:700, letterSpacing:3, color:"rgba(255,255,255,0.6)", marginBottom:10, textTransform:"uppercase" }}>Finished</div>
+                )}
+                {s.book?.title && (
+                  <div style={{ fontSize:26, fontWeight:800, color:"#fff", lineHeight:1.1, letterSpacing:-0.5, marginBottom:4 }}>{s.book.title}</div>
+                )}
+                {s.book?.author_name?.[0] && (
+                  <div style={{ fontSize:14, color:"rgba(255,255,255,0.6)", marginBottom:14, letterSpacing:0.3 }}>{s.book.author_name[0]}</div>
+                )}
+                <div style={{ display:"flex", gap:16, flexWrap:"wrap" }}>
+                  <div>
+                    <div style={{ fontSize:22, fontWeight:700, color:"#fff", letterSpacing:-0.5, lineHeight:1 }}>{fmtLabel(s.time_secs||0)}</div>
+                    <div style={{ fontSize:9, color:"rgba(255,255,255,0.4)", letterSpacing:2, marginTop:3, textTransform:"uppercase" }}>read</div>
+                  </div>
+                  {s.pages_read > 0 && (
+                    <div>
+                      <div style={{ fontSize:22, fontWeight:700, color:"#fff", letterSpacing:-0.5, lineHeight:1 }}>{s.pages_read}</div>
+                      <div style={{ fontSize:9, color:"rgba(255,255,255,0.4)", letterSpacing:2, marginTop:3, textTransform:"uppercase" }}>pages</div>
+                    </div>
+                  )}
+                  {s.current_page > 0 && (
+                    <div>
+                      <div style={{ fontSize:22, fontWeight:700, color:"#fff", letterSpacing:-0.5, lineHeight:1 }}>p.{s.current_page}</div>
+                      <div style={{ fontSize:9, color:"rgba(255,255,255,0.4)", letterSpacing:2, marginTop:3, textTransform:"uppercase" }}>on page</div>
+                    </div>
+                  )}
+                </div>
+                <div style={{ fontSize:11, color:"rgba(255,255,255,0.35)", marginTop:14, letterSpacing:1 }}>{s.date_str}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+        <BottomNav screen={screen} setScreen={setScreen} onStartTimer={() => { setElapsed(0); setTimerRunning(false); setCountdownDone(false); setScreen(SCREENS.TIMER); }}/>
       </div>
     );
   }
