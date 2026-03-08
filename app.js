@@ -293,6 +293,10 @@ function Bookmark() {
   const [profile, setProfile]                   = useState({ goal_minutes:0, goal_pages:0, streak:0, last_read_date:"" });
   const [showStreakModal, setShowStreakModal]     = useState(false);
   const [newStreak, setNewStreak]               = useState(0);
+  const [newStreak, setNewStreak]               = useState(0);
+  const [gMin, setGMin] = useState("");
+  const [gPg, setGPg] = useState("");
+  const [goalsSaving, setGoalsSaving] = useState(false);
 
   // ── Sessions state ──
   const [sessions, setSessions]                 = useState([]);
