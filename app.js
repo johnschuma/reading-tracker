@@ -9,7 +9,7 @@ const { useState, useEffect, useRef, useCallback } = React;
 const { createClient } = supabase;
 const sb = createClient(SUPABASE_URL, SUPABASE_ANON);
 
-const SCREENS = { AUTH:"auth", HOME:"home", TIMER:"timer", CAMERA:"camera", COMPOSE:"compose", GOALS:"goals", HISTORY:"history", ACCOUNT:"account" };
+const SCREENS = { AUTH:"auth", HOME:"home", TIMER:"timer", CAMERA:"camera", COMPOSE:"compose", GOALS:"goals", HISTORY:"history", ACCOUNT:"account", BOOKS:"books" };
 
 const QUOTES = [
   { text:"A reader lives a thousand lives before he dies. The man who never reads lives only one.", author:"George R.R. Martin" },
@@ -241,15 +241,13 @@ function BottomNav({ screen, setScreen, onStartTimer }) {
         </svg>
         <span style={activeLabel(SCREENS.HOME)}>Home</span>
       </button>
-      {/* History */}
-      <button style={navBtn(SCREENS.HISTORY)} onClick={() => setScreen(SCREENS.HISTORY)}>
+      {/* Books */}
+      <button style={navBtn(SCREENS.BOOKS)} onClick={() => setScreen(SCREENS.BOOKS)}>
         <svg width={22} height={22} viewBox="0 0 24 24" fill="none">
-          <rect x="3" y="3" width="7" height="7" rx="1" stroke={active(SCREENS.HISTORY)} strokeWidth="1.8" fill={screen===SCREENS.HISTORY ? "rgba(255,255,255,0.12)" : "none"}/>
-          <rect x="14" y="3" width="7" height="7" rx="1" stroke={active(SCREENS.HISTORY)} strokeWidth="1.8" fill={screen===SCREENS.HISTORY ? "rgba(255,255,255,0.12)" : "none"}/>
-          <rect x="3" y="14" width="7" height="7" rx="1" stroke={active(SCREENS.HISTORY)} strokeWidth="1.8" fill={screen===SCREENS.HISTORY ? "rgba(255,255,255,0.12)" : "none"}/>
-          <rect x="14" y="14" width="7" height="7" rx="1" stroke={active(SCREENS.HISTORY)} strokeWidth="1.8" fill={screen===SCREENS.HISTORY ? "rgba(255,255,255,0.12)" : "none"}/>
+          <path d="M4 19.5A2.5 2.5 0 016.5 17H20" stroke={active(SCREENS.BOOKS)} strokeWidth="1.8" strokeLinecap="round"/>
+          <path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z" stroke={active(SCREENS.BOOKS)} strokeWidth="1.8" strokeLinejoin="round" fill={screen===SCREENS.BOOKS ? "rgba(255,255,255,0.08)" : "none"}/>
         </svg>
-        <span style={activeLabel(SCREENS.HISTORY)}>History</span>
+        <span style={activeLabel(SCREENS.BOOKS)}>Books</span>
       </button>
       {/* Record (center) */}
       <button onClick={onStartTimer}
@@ -325,6 +323,13 @@ function Bookmark() {
   const [searchError, setSearchError]       = useState(null);
   const [selectedBook, setSelectedBook]     = useState(null);
   const [recentBooks, setRecentBooks]       = useState(() => { try { return JSON.parse(localStorage.getItem("bm_recent") || "[]"); } catch { return []; } });
+  const [bookshelf, setBookshelf]           = useState(() => { try { return JSON.parse(localStorage.getItem("bm_shelf") || "[]"); } catch { return []; } });
+  const [shelfQuery, setShelfQuery]         = useState("");
+  const [shelfResults, setShelfResults]     = useState([]);
+  const [shelfSearching, setShelfSearching] = useState(false);
+  const [shelfSearchErr, setShelfSearchErr] = useState(null);
+  const [shelfFilter, setShelfFilter]       = useState("all");
+  const [bookDetail, setBookDetail]         = useState(null);
   const [startingPage, setStartingPage]     = useState("");
   const [currentPage, setCurrentPage]       = useState("");
   const [bookFinished, setBookFinished]     = useState(false);
@@ -747,6 +752,33 @@ function Bookmark() {
             </div>
           </div>
 
+          {/* ── Currently reading ── */}
+          {(() => {
+            const reading = bookshelf.filter(b => b.status === "reading");
+            if (reading.length === 0) return null;
+            return (
+              <div style={{ marginBottom:14 }}>
+                <div style={{ fontSize:9, letterSpacing:3, color:"rgba(255,255,255,0.25)", marginBottom:10 }}>NOW READING</div>
+                <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
+                  {reading.map(b => (
+                    <div key={b.id} onClick={() => { setBookDetail(b); setScreen(SCREENS.BOOKS); }}
+                      style={{ display:"flex", alignItems:"center", gap:14, padding:"12px 14px", background:"rgba(255,255,255,0.04)", border:"1px solid rgba(255,255,255,0.08)", borderRadius:16, cursor:"pointer" }}>
+                      {b.open_library_cover_id
+                        ? <img src={"https://covers.openlibrary.org/b/id/"+b.open_library_cover_id+"-M.jpg"} crossOrigin="anonymous" style={{ width:40, height:52, borderRadius:6, objectFit:"cover", flexShrink:0 }}/>
+                        : <div style={{ width:40, height:52, borderRadius:6, background:"rgba(255,255,255,0.08)", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}><LogoMark size={18} color="rgba(255,255,255,0.3)"/></div>}
+                      <div style={{ flex:1, minWidth:0 }}>
+                        <div style={{ fontSize:14, fontWeight:700, color:"#fff", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{b.title}</div>
+                        <div style={{ fontSize:11, color:"rgba(255,255,255,0.4)", marginTop:2 }}>{b.author_name?.[0] || b.author || ""}</div>
+                        {b.currentPage > 0 && <div style={{ fontSize:10, color:"rgba(255,255,255,0.25)", marginTop:4 }}>p. {b.currentPage}</div>}
+                      </div>
+                      <svg width={14} height={14} viewBox="0 0 24 24" fill="none"><path d="M9 18L15 12L9 6" stroke="rgba(255,255,255,0.25)" strokeWidth="2" strokeLinecap="round"/></svg>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
+
           {/* ── Today progress (below timer) ── */}
           {hasGoals && (
             <div style={{ ...S.card, display:"flex", alignItems:"center", gap:18, padding:"16px 18px", marginBottom:6 }}>
@@ -784,6 +816,13 @@ function Bookmark() {
               </div>
             </div>
           )}
+
+          {/* ── History shortcut ── */}
+          <div onClick={() => setScreen(SCREENS.HISTORY)}
+            style={{ display:"flex", alignItems:"center", justifyContent:"space-between", padding:"12px 16px", background:"rgba(255,255,255,0.03)", border:"1px solid rgba(255,255,255,0.06)", borderRadius:14, cursor:"pointer", marginBottom:4 }}>
+            <span style={{ fontSize:13, color:"rgba(255,255,255,0.4)" }}>Reading history</span>
+            <svg width={14} height={14} viewBox="0 0 24 24" fill="none"><path d="M9 18L15 12L9 6" stroke="rgba(255,255,255,0.2)" strokeWidth="2" strokeLinecap="round"/></svg>
+          </div>
         </div>
 
         <BottomNav screen={screen} setScreen={setScreen} onStartTimer={() => { setElapsed(0); setTimerRunning(false); setCountdownDone(false); setScreen(SCREENS.TIMER); }}/>
@@ -1505,6 +1544,248 @@ function Bookmark() {
             { label:"Sign Out", danger:true, action: handleSignOut, icon:<svg width={18} height={18} viewBox="0 0 24 24" fill="none"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4" stroke="#f87171" strokeWidth="1.8" strokeLinecap="round"/><polyline points="16 17 21 12 16 7" stroke="#f87171" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/><line x1="21" y1="12" x2="9" y2="12" stroke="#f87171" strokeWidth="1.8" strokeLinecap="round"/></svg> },
           ]}/>
           <div style={{ textAlign:"center", fontSize:10, color:"rgba(255,255,255,0.12)", marginTop:8 }}>Bookmark v1.0</div>
+        </div>
+        <BottomNav screen={screen} setScreen={setScreen} onStartTimer={() => { setElapsed(0); setTimerRunning(false); setCountdownDone(false); setScreen(SCREENS.TIMER); }}/>
+      </div>
+    );
+  }
+
+  // ── Books ──
+  if (screen === SCREENS.BOOKS) {
+
+    const saveShelf = (updated) => {
+      setBookshelf(updated);
+      try { localStorage.setItem("bm_shelf", JSON.stringify(updated)); } catch {}
+    };
+
+    const addToShelf = (book, status) => {
+      const existing = bookshelf.find(b => b.title === book.title);
+      if (existing) {
+        saveShelf(bookshelf.map(b => b.title === book.title ? { ...b, status } : b));
+      } else {
+        const entry = { ...book, id: Date.now().toString(), status, addedAt: new Date().toISOString(), currentPage: 0, notes: "" };
+        saveShelf([...bookshelf, entry]);
+      }
+      setShelfResults([]); setShelfQuery(""); setBookDetail(null);
+    };
+
+    const removeFromShelf = (id) => {
+      saveShelf(bookshelf.filter(b => b.id !== id));
+      setBookDetail(null);
+    };
+
+    const updateStatus = (id, status) => {
+      saveShelf(bookshelf.map(b => b.id === id ? { ...b, status } : b));
+      setBookDetail(prev => prev && prev.id === id ? { ...prev, status } : prev);
+    };
+
+    const updatePage = (id, pg) => {
+      saveShelf(bookshelf.map(b => b.id === id ? { ...b, currentPage: parseInt(pg) || 0 } : b));
+      setBookDetail(prev => prev && prev.id === id ? { ...prev, currentPage: parseInt(pg) || 0 } : prev);
+    };
+
+    const searchShelf = async () => {
+      if (!shelfQuery.trim()) return;
+      setShelfSearching(true); setShelfSearchErr(null); setShelfResults([]);
+      try { setShelfResults(await claudeSearchBooks(shelfQuery)); }
+      catch { setShelfSearchErr("Search failed."); }
+      setShelfSearching(false);
+    };
+
+    const STATUS_LABELS = { reading:"Reading", read:"Read", owned:"Owned", want:"Want to Read" };
+    const STATUS_ORDER  = ["reading","want","owned","read"];
+    const STATUS_COLORS = { reading:"rgba(255,255,255,0.9)", read:"rgba(255,255,255,0.5)", owned:"rgba(255,255,255,0.6)", want:"rgba(255,255,255,0.4)" };
+
+    const filtered = shelfFilter === "all" ? bookshelf : bookshelf.filter(b => b.status === shelfFilter);
+
+    // ── Book detail modal ──
+    if (bookDetail) {
+      const sessionsForBook = sessions.filter(s => s.book?.title === bookDetail.title);
+      const totalMinsRead = Math.round(sessionsForBook.reduce((a,s)=>a+(s.time_secs||0),0)/60);
+      const totalPagesRead = sessionsForBook.reduce((a,s)=>a+(s.pages_read||0),0);
+      const onShelf = bookshelf.find(b=>b.id===bookDetail.id);
+      return (
+        <div style={{ ...S.app, paddingBottom:90 }}>
+          {/* Cover hero */}
+          <div style={{ position:"relative", minHeight:280, background:"linear-gradient(to bottom, rgba(7,7,15,0) 0%, #07070f 100%)", overflow:"hidden" }}>
+            {bookDetail.open_library_cover_id
+              ? <img src={"https://covers.openlibrary.org/b/id/"+bookDetail.open_library_cover_id+"-L.jpg"} crossOrigin="anonymous"
+                  style={{ position:"absolute", inset:0, width:"100%", height:"100%", objectFit:"cover", opacity:0.25, filter:"blur(12px)", transform:"scale(1.1)" }}/>
+              : <div style={{ position:"absolute", inset:0, background:"linear-gradient(135deg,#0f0c29,#302b63)" }}/>}
+            <div style={{ position:"relative", padding:"18px 22px 0", display:"flex", alignItems:"center", gap:12 }}>
+              <button onClick={() => setBookDetail(null)} style={{ ...S.back, fontSize:14 }}>← Back</button>
+            </div>
+            <div style={{ position:"relative", padding:"16px 22px 24px", display:"flex", gap:18, alignItems:"flex-end" }}>
+              {bookDetail.open_library_cover_id
+                ? <img src={"https://covers.openlibrary.org/b/id/"+bookDetail.open_library_cover_id+"-M.jpg"} crossOrigin="anonymous"
+                    style={{ width:80, height:108, borderRadius:8, objectFit:"cover", boxShadow:"0 8px 32px rgba(0,0,0,0.6)", flexShrink:0 }}/>
+                : <div style={{ width:80, height:108, borderRadius:8, background:"rgba(255,255,255,0.08)", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}><LogoMark size={28} color="rgba(255,255,255,0.3)"/></div>}
+              <div style={{ flex:1, minWidth:0, paddingBottom:4 }}>
+                <div style={{ fontSize:20, fontWeight:800, lineHeight:1.15, letterSpacing:-0.5, marginBottom:6 }}>{bookDetail.title}</div>
+                <div style={{ fontSize:13, color:"rgba(255,255,255,0.5)" }}>{bookDetail.author_name?.[0] || bookDetail.author || ""}</div>
+                {bookDetail.first_publish_year && <div style={{ fontSize:11, color:"rgba(255,255,255,0.25)", marginTop:3 }}>{bookDetail.first_publish_year}</div>}
+              </div>
+            </div>
+          </div>
+
+          <div style={{ padding:"0 22px 20px" }}>
+            {/* Status pills */}
+            <div style={{ marginBottom:18 }}>
+              <div style={{ fontSize:9, letterSpacing:2, color:"rgba(255,255,255,0.25)", marginBottom:10 }}>SHELF STATUS</div>
+              <div style={{ display:"flex", gap:6, flexWrap:"wrap" }}>
+                {STATUS_ORDER.map(s => (
+                  <button key={s} onClick={() => onShelf ? updateStatus(bookDetail.id, s) : addToShelf(bookDetail, s)}
+                    style={{ padding:"8px 16px", borderRadius:20, border: "1px solid " + (onShelf?.status===s||(!onShelf&&false) ? "rgba(255,255,255,0.6)" : "rgba(255,255,255,0.12)"),
+                      background: onShelf?.status===s ? "rgba(255,255,255,0.15)" : "rgba(255,255,255,0.04)",
+                      color: onShelf?.status===s ? "#fff" : "rgba(255,255,255,0.5)",
+                      cursor:"pointer", fontSize:13, fontFamily:"inherit", fontWeight: onShelf?.status===s ? 700 : 400 }}>
+                    {STATUS_LABELS[s]}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Current page tracker */}
+            {onShelf?.status === "reading" && (
+              <div style={{ ...S.card, marginBottom:14, padding:"14px 16px" }}>
+                <div style={{ fontSize:9, letterSpacing:2, color:"rgba(255,255,255,0.25)", marginBottom:8 }}>CURRENT PAGE</div>
+                <div style={{ display:"flex", gap:10, alignItems:"center" }}>
+                  <input type="number" placeholder="e.g. 142" value={onShelf.currentPage || ""}
+                    onChange={e => updatePage(bookDetail.id, e.target.value)}
+                    style={{ ...S.inp, width:110, padding:"10px 12px", fontSize:18, fontWeight:700 }}/>
+                  <span style={{ fontSize:13, color:"rgba(255,255,255,0.3)" }}>pages in</span>
+                </div>
+              </div>
+            )}
+
+            {/* Reading stats for this book */}
+            {sessionsForBook.length > 0 && (
+              <div style={{ ...S.card, marginBottom:14, padding:"14px 16px" }}>
+                <div style={{ fontSize:9, letterSpacing:2, color:"rgba(255,255,255,0.25)", marginBottom:10 }}>YOUR READING</div>
+                <div style={{ display:"flex", gap:20 }}>
+                  <div>
+                    <div style={{ fontSize:22, fontWeight:800, letterSpacing:-1 }}>{totalMinsRead}</div>
+                    <div style={{ fontSize:9, color:"rgba(255,255,255,0.35)", letterSpacing:1 }}>MINUTES</div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize:22, fontWeight:800, letterSpacing:-1 }}>{totalPagesRead}</div>
+                    <div style={{ fontSize:9, color:"rgba(255,255,255,0.35)", letterSpacing:1 }}>PAGES</div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize:22, fontWeight:800, letterSpacing:-1 }}>{sessionsForBook.length}</div>
+                    <div style={{ fontSize:9, color:"rgba(255,255,255,0.35)", letterSpacing:1 }}>SESSIONS</div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Add to session shortcut */}
+            <button onClick={() => { setSelectedBook({ title:bookDetail.title, author_name:bookDetail.author_name, open_library_cover_id:bookDetail.open_library_cover_id }); setElapsed(0); setTimerRunning(false); setCountdownDone(false); setScreen(SCREENS.TIMER); }}
+              style={{ ...S.pBtn, marginTop:0, marginBottom:10 }}>Start Reading This Book</button>
+
+            {onShelf && (
+              <button onClick={() => removeFromShelf(bookDetail.id)}
+                style={{ ...S.gBtn, color:"rgba(255,100,100,0.6)", marginTop:0 }}>Remove from Shelf</button>
+            )}
+          </div>
+          <BottomNav screen={screen} setScreen={setScreen} onStartTimer={() => { setElapsed(0); setTimerRunning(false); setCountdownDone(false); setScreen(SCREENS.TIMER); }}/>
+        </div>
+      );
+    }
+
+    // ── Bookshelf main view ──
+    return (
+      <div style={{ ...S.app, paddingBottom:90 }}>
+        <div style={{ padding:"22px 22px 12px" }}>
+          <span style={{ ...S.logoText, fontSize:16 }}>MY BOOKS</span>
+          <div style={{ fontSize:12, color:"rgba(255,255,255,0.25)", marginTop:4 }}>{bookshelf.length} book{bookshelf.length!==1?"s":""} on your shelf</div>
+        </div>
+
+        {/* Search */}
+        <div style={{ padding:"0 22px 14px" }}>
+          <div style={{ display:"flex", gap:8 }}>
+            <input style={{ ...S.inp, flex:1, padding:"12px 14px" }} placeholder="Search to add books…"
+              value={shelfQuery} onChange={e => setShelfQuery(e.target.value)} onKeyDown={e => e.key==="Enter" && searchShelf()}/>
+            <button onClick={searchShelf} disabled={shelfSearching}
+              style={{ padding:"0 18px", borderRadius:12, border:"none", background: shelfSearching ? "rgba(255,255,255,0.08)" : "linear-gradient(135deg,#fff,#888)", color: shelfSearching ? "#fff" : "#000", cursor: shelfSearching ? "default" : "pointer", fontSize:18, flexShrink:0 }}>
+              {shelfSearching ? "…" : "→"}
+            </button>
+          </div>
+          {shelfSearchErr && <div style={{ color:"#f87171", fontSize:12, marginTop:8 }}>{shelfSearchErr}</div>}
+
+          {/* Search results */}
+          {shelfResults.length > 0 && (
+            <div style={{ marginTop:12, background:"rgba(255,255,255,0.04)", border:"1px solid rgba(255,255,255,0.08)", borderRadius:16, overflow:"hidden" }}>
+              <div style={{ fontSize:9, letterSpacing:2, color:"rgba(255,255,255,0.25)", padding:"12px 16px 8px" }}>ADD TO SHELF</div>
+              {shelfResults.map((book, i) => (
+                <div key={i} style={{ display:"flex", alignItems:"center", gap:12, padding:"10px 16px", borderTop: i>0 ? "1px solid rgba(255,255,255,0.05)" : "none" }}>
+                  {book.open_library_cover_id
+                    ? <img src={"https://covers.openlibrary.org/b/id/"+book.open_library_cover_id+"-S.jpg"} crossOrigin="anonymous" style={{ width:32, height:44, borderRadius:4, objectFit:"cover", flexShrink:0 }}/>
+                    : <div style={{ width:32, height:44, borderRadius:4, background:"rgba(255,255,255,0.08)", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}><LogoMark size={14} color="rgba(255,255,255,0.4)"/></div>}
+                  <div style={{ flex:1, minWidth:0 }}>
+                    <div style={{ fontSize:13, fontWeight:600, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{book.title}</div>
+                    <div style={{ fontSize:11, color:"rgba(255,255,255,0.4)", marginTop:1 }}>{book.author_name?.[0]}</div>
+                  </div>
+                  <div style={{ display:"flex", gap:4 }}>
+                    {[["reading","📖"],["want","★"],["owned","◈"],["read","✓"]].map(([s,ico]) => (
+                      <button key={s} onClick={() => addToShelf(book, s)} title={STATUS_LABELS[s]}
+                        style={{ width:32, height:32, borderRadius:8, border:"1px solid rgba(255,255,255,0.12)", background:"rgba(255,255,255,0.06)", color:"rgba(255,255,255,0.7)", cursor:"pointer", fontSize:13, display:"flex", alignItems:"center", justifyContent:"center" }}>
+                        {ico}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ))}
+              <button onClick={() => { setShelfResults([]); setShelfQuery(""); }}
+                style={{ width:"100%", padding:"10px", background:"none", border:"none", borderTop:"1px solid rgba(255,255,255,0.05)", color:"rgba(255,255,255,0.25)", cursor:"pointer", fontSize:12, fontFamily:"inherit" }}>
+                Clear results
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* Filter tabs */}
+        <div style={{ display:"flex", gap:0, margin:"0 22px 16px", background:"rgba(255,255,255,0.05)", borderRadius:12, padding:3, overflowX:"auto" }}>
+          {[["all","All"],["reading","Reading"],["want","Want"],["owned","Owned"],["read","Read"]].map(([f,lbl]) => (
+            <button key={f} onClick={() => setShelfFilter(f)}
+              style={{ flex:1, minWidth:52, padding:"9px 0", borderRadius:10, border:"none", cursor:"pointer", fontSize:11, fontFamily:"inherit", fontWeight:600, whiteSpace:"nowrap",
+                background: shelfFilter===f ? "linear-gradient(135deg,#fff,#aaa)" : "transparent",
+                color: shelfFilter===f ? "#000" : "rgba(255,255,255,0.4)" }}>
+              {lbl}{f!=="all" ? " "+bookshelf.filter(b=>b.status===f).length : ""}
+            </button>
+          ))}
+        </div>
+
+        {/* Book list */}
+        <div style={{ padding:"0 22px" }}>
+          {filtered.length === 0 ? (
+            <div style={{ textAlign:"center", padding:"40px 0", color:"rgba(255,255,255,0.15)", fontSize:14, fontStyle:"italic", lineHeight:1.8 }}>
+              {shelfFilter==="all" ? "Your shelf is empty.
+Search above to add books." : "No books in this category yet."}
+            </div>
+          ) : (
+            <div style={{ display:"flex", flexDirection:"column", gap:0 }}>
+              {filtered.map((b, i) => (
+                <div key={b.id} onClick={() => setBookDetail(b)}
+                  style={{ display:"flex", alignItems:"center", gap:14, padding:"14px 0", borderBottom: i<filtered.length-1 ? "1px solid rgba(255,255,255,0.05)" : "none", cursor:"pointer" }}>
+                  {b.open_library_cover_id
+                    ? <img src={"https://covers.openlibrary.org/b/id/"+b.open_library_cover_id+"-S.jpg"} crossOrigin="anonymous" style={{ width:40, height:56, borderRadius:6, objectFit:"cover", flexShrink:0 }}/>
+                    : <div style={{ width:40, height:56, borderRadius:6, background:"rgba(255,255,255,0.08)", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}><LogoMark size={16} color="rgba(255,255,255,0.3)"/></div>}
+                  <div style={{ flex:1, minWidth:0 }}>
+                    <div style={{ fontSize:14, fontWeight:700, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{b.title}</div>
+                    <div style={{ fontSize:11, color:"rgba(255,255,255,0.4)", marginTop:2, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{b.author_name?.[0] || b.author || ""}</div>
+                    <div style={{ marginTop:5, display:"inline-block", padding:"2px 8px", borderRadius:6, background:"rgba(255,255,255,0.07)", fontSize:9, letterSpacing:1, color:STATUS_COLORS[b.status], textTransform:"uppercase" }}>{STATUS_LABELS[b.status]}</div>
+                  </div>
+                  {b.status==="reading" && b.currentPage > 0 && (
+                    <div style={{ textAlign:"right", flexShrink:0 }}>
+                      <div style={{ fontSize:13, fontWeight:700, color:"rgba(255,255,255,0.6)" }}>p.{b.currentPage}</div>
+                    </div>
+                  )}
+                  <svg width={12} height={12} viewBox="0 0 24 24" fill="none" style={{ flexShrink:0 }}><path d="M9 18L15 12L9 6" stroke="rgba(255,255,255,0.2)" strokeWidth="2" strokeLinecap="round"/></svg>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
         <BottomNav screen={screen} setScreen={setScreen} onStartTimer={() => { setElapsed(0); setTimerRunning(false); setCountdownDone(false); setScreen(SCREENS.TIMER); }}/>
       </div>
