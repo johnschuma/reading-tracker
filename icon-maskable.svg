@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" fill="#07070f"/>
+  <g transform="translate(256,256)">
+    <path d="M0 -150 C-14 -150 -85 -143 -85 -82 L-85 132 C-51 113 -21 107 0 132 C21 107 51 113 85 132 L85 -82 C85 -143 14 -150 0 -150Z" stroke="white" stroke-width="15" stroke-linejoin="round" fill="none"/>
+    <path d="M0 -150 L0 132" stroke="white" stroke-width="10" stroke-dasharray="13 13" opacity="0.4"/>
+    <path d="M-55 -55 L-21 -55 M-55 -14 L-21 -14 M-55 27 L-21 27" stroke="white" stroke-width="11" stroke-linecap="round" opacity="0.6"/>
+  </g>
+</svg>

@@ -53,17 +53,13 @@ const fmtLabel = s => {
 const todayStr = () => new Date().toISOString().slice(0, 10);
 
 async function claudeSearchBooks(query) {
-  const r = await fetch("https://api.anthropic.com/v1/messages", {
+  const r = await fetch("/.netlify/functions/search-books", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      model: "claude-sonnet-4-20250514",
-      max_tokens: 1000,
-      messages: [{ role: "user", content: "You are a book database. Return a JSON array of up to 5 real books matching: " + JSON.stringify(query) + ". Each object: title (string), author_name (array of strings), first_publish_year (string), open_library_cover_id (integer or null). ONLY raw JSON array." }]
-    })
+    body: JSON.stringify({ query }),
   });
-  const d = await r.json();
-  return JSON.parse((d.content?.[0]?.text || "[]").replace(/```json|```/g, "").trim());
+  if (!r.ok) throw new Error("Search failed");
+  return r.json();
 }
 
 function playAlarm() {
